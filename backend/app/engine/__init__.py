@@ -13,6 +13,10 @@ from app.engine.effective import (
     filter_effective_rules,
     is_rule_effective,
 )
+from app.engine.periods import (
+    PeriodBounds,
+    get_period_bounds,
+)
 from app.engine.selection import (
     SelectionResult,
     create_no_applicable_rule_evaluation,
@@ -53,6 +57,7 @@ __all__ = [
     "ExclusionType",
     "IneligibleReason",
     "Period",
+    "PeriodBounds",
     "PostCapBehavior",
     "Purchase",
     "RoundingMode",
@@ -70,6 +75,7 @@ __all__ = [
     "create_no_effective_rule_evaluation",
     "filter_applicable_rules",
     "filter_effective_rules",
+    "get_period_bounds",
     "is_rule_effective",
     "select_best_rule",
     "sort_rules_by_selection_priority",

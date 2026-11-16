@@ -394,3 +394,29 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Per-transaction minimum threshold (`min_transaction_cents`) implemented and verified against AC-7. Satisfied.
+
+
+### Task T13: Period Utilities (Monthly, Quarterly, Calendar Year, Card-Year)
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement pure, deterministic period boundary utilities for `Period.MONTHLY`, `Period.QUARTERLY`, `Period.CALENDAR_YEAR`, and `Period.CARD_YEAR` per BACKLOG T13 and ARCHITECTURE §4.4.
+- **Implementation Details:**
+  - Created `backend/app/engine/periods.py`:
+    - `PeriodBounds`: Frozen, slotted dataclass (`start_date`, `end_date`, `next_reset_date`) with `__post_init__` invariants (`end_date >= start_date`, `next_reset_date == end_date + timedelta(days=1)`).
+    - `get_period_bounds(period, target_date, opened_on=None)`: Computes inclusive `[start_date, end_date]` and `next_reset_date` without floats or system clock access.
+    - `CARD_YEAR`: Requires `opened_on`, rejects `target_date < opened_on` with `ValueError`, computes anniversary-based period ending the day before the next anniversary, and clamps Feb 29 openings to Feb 28 in non-leap years (keeping Feb 29 in leap years).
+  - Exported `PeriodBounds` and `get_period_bounds` from `backend/app/engine/__init__.py`.
+  - Added table-driven tests in `backend/tests/engine/test_periods.py` (34 parametrized/unit cases) covering all four periods, month transitions (Jan/Dec), all four calendar quarters, Dec 31 / Jan 1 year-end transitions, leap day (Feb 29) in monthly/quarterly/calendar-year/card-year periods, missing `opened_on`, `target_date < opened_on`, determinism, and frozen immutability.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Approved `PeriodBounds` structure, inclusive bounds with `next_reset_date`, `ValueError` guards for `CARD_YEAR`, and Feb 29 -> Feb 28 clamping in non-leap years.
+  - **AI Executed:** Followed test-first TDD, implemented pure period math, verified all tests and static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_periods.py`: 34 passed in 0.14s.
+  - `uv run --directory backend --extra dev pytest`: 113 passed in 0.54s (includes `test_no_float.py`).
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 6 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 19 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 35 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Period utilities for monthly, quarterly, calendar year, and card-year boundaries implemented with table tests including leap day and year-end. Satisfied.
