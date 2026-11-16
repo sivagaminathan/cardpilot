@@ -64,4 +64,34 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `ruff format --check backend`: 19 files already formatted.
   - `mypy backend`: Success: no issues found in 19 source files.
 - **Acceptance Criteria [Done when]:**
-  - `pytest`, `ruff`, `mypy` pass locally. Satisfied.
+  - `pytest`, `ruff`, `mypy` pass locally. Satisfied (`491c3df`).
+
+### Task T03: Frontend Skeleton & Dashboard Foundation
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** Vite + React + TS strict, ESLint, Vitest + React Testing Library suite, initial CardPilot dashboard.
+- **Implementation Details:**
+  - Created frontend layout according to `ARCHITECTURE.md` §6:
+    `frontend/src/` (`components/`, `lib/`, `test/`, `types/`).
+  - Authored `frontend/package.json` with React 18, Vite 5, TypeScript 5, Vitest 2, React Testing Library, and ESLint 9.
+  - Configured `frontend/tsconfig.json` with strict mode enabled, no `any` permitted, and bundler module resolution.
+  - Configured `frontend/vite.config.ts` with `@vitejs/plugin-react` and Vitest JSDOM environment with testing library setup.
+  - Configured `frontend/eslint.config.js` with TypeScript ESLint and React Hooks rules.
+  - Implemented `frontend/src/lib/formatters.ts` with `formatCentsToUsd` providing integer cents to USD string formatting without binary float arithmetic.
+  - Implemented accessible UI components:
+    - `DisclaimerBanner.tsx`: Prominent sample data disclaimer banner (FR-7, AC-17).
+    - `Header.tsx`: Brand header with navigation tabs and demo profile switcher (FR-1: Maya, Dev, Reviewer Rivera).
+    - `Dashboard.tsx`: Cardholder portfolio overview, upcoming benefit reset alerts expiring in < 30 days (FR-25), and separated currency reward balances (FR-27).
+    - `App.tsx`: Main layout, profile selection state, and active navigation tab rendering.
+    - `index.css`: Semantic CSS variables, accessible focus outlines, responsive grids, and design tokens.
+  - Implemented Vitest + React Testing Library test suite in `frontend/src/App.test.tsx` (6 unit/component test cases).
+  - Tracked `backend/uv.lock` dependency lockfile.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Directed implementation of T03 on `main` after confirming T02 was committed/pushed, approved frontend scope.
+  - **AI Executed:** Built frontend skeleton, initial dashboard, formatters, accessible styles, and test suite.
+- **Verification & Testing:**
+  - `npm test`: 6 passed in 3.31s (`src/App.test.tsx`).
+  - `npm run lint`: ESLint passed with 0 errors, 0 warnings.
+  - `npm run build`: `tsc && vite build` built in 885ms (`dist/index.html`, `dist/assets/`).
+- **Acceptance Criteria [Done when]:**
+  - `npm test`, `npm run lint`, `npm run build` pass. Satisfied.
