@@ -1,0 +1,397 @@
+"""Unit tests for reward engine applicability and exclusion rules (T10, AC-4).
+
+Validates scope matching (BASE, CATEGORY, MERCHANT), merchant presence checks,
+exclusion matching (category, merchant, merchant_tag), case/whitespace normalization,
+precedence rules, order preservation, and rejection trace step generation.
+"""
+
+from datetime import date
+from decimal import Decimal
+
+from app.engine.applicability import (
+    ApplicabilityResult,
+    check_rule_applicability,
+    filter_applicable_rules,
+)
+from app.engine.types import (
+    EarningRule,
+    ExclusionType,
+    Purchase,
+    RuleExclusion,
+    ScopeType,
+)
+
+
+def _make_rule(
+    id: int,
+    rule_key: str,
+    scope_type: ScopeType,
+    category: str | None = None,
+    merchant: str | None = None,
+    exclusions: tuple[RuleExclusion, ...] = (),
+    multiplier: str = "1.0",
+) -> EarningRule:
+    """Helper to construct an EarningRule for applicability testing."""
+    return EarningRule(
+        id=id,
+        rule_key=rule_key,
+        version=1,
+        scope_type=scope_type,
+        multiplier=Decimal(multiplier),
+        effective_from=date(2026, 1, 1),
+        category=category,
+        merchant=merchant,
+        exclusions=exclusions,
+    )
+
+
+def _make_purchase(
+    category: str = "dining",
+    merchant: str | None = None,
+    merchant_tags: tuple[str, ...] = (),
+    amount_cents: int = 10000,
+) -> Purchase:
+    """Helper to construct a Purchase for applicability testing."""
+    return Purchase(
+        amount_cents=amount_cents,
+        category=category,
+        purchase_date=date(2026, 11, 15),
+        merchant=merchant,
+        merchant_tags=merchant_tags,
+    )
+
+
+class TestScopeMatching:
+    """Tests for BASE, CATEGORY, and MERCHANT scope matching."""
+
+    def test_base_scope_matches_any_purchase(self) -> None:
+        base_rule = _make_rule(1, "base.standard", ScopeType.BASE)
+
+        p1 = _make_purchase(category="dining")
+        p2 = _make_purchase(category="groceries", merchant="Acme Mart")
+        p3 = _make_purchase(category="travel", merchant="FlyAir", merchant_tags=("airline",))
+
+        res1 = check_rule_applicability(base_rule, p1)
+        res2 = check_rule_applicability(base_rule, p2)
+        res3 = check_rule_applicability(base_rule, p3)
+
+        assert res1.is_applicable is True
+        assert res1.rejection_reason is None
+        assert res2.is_applicable is True
+        assert res3.is_applicable is True
+
+    def test_category_scope_match_and_mismatch(self) -> None:
+        dining_rule = _make_rule(2, "dining.3x", ScopeType.CATEGORY, category="dining")
+
+        p_match = _make_purchase(category="dining")
+        p_mismatch = _make_purchase(category="groceries")
+
+        res_match = check_rule_applicability(dining_rule, p_match)
+        res_mismatch = check_rule_applicability(dining_rule, p_mismatch)
+
+        assert isinstance(res_match, ApplicabilityResult)
+        assert res_match.is_applicable is True
+
+        assert res_mismatch.is_applicable is False
+        assert res_mismatch.rejection_reason == "category_mismatch"
+        assert res_mismatch.rejection_detail is not None
+        assert "groceries" in res_mismatch.rejection_detail
+        assert "dining" in res_mismatch.rejection_detail
+
+    def test_merchant_scope_match_and_mismatch(self) -> None:
+        coffee_rule = _make_rule(3, "coffee.5x", ScopeType.MERCHANT, merchant="Acme Coffee")
+
+        p_match = _make_purchase(category="dining", merchant="Acme Coffee")
+        p_mismatch = _make_purchase(category="dining", merchant="Other Cafe")
+
+        res_match = check_rule_applicability(coffee_rule, p_match)
+        res_mismatch = check_rule_applicability(coffee_rule, p_mismatch)
+
+        assert res_match.is_applicable is True
+
+        assert res_mismatch.is_applicable is False
+        assert res_mismatch.rejection_reason == "merchant_mismatch"
+        assert "Other Cafe" in res_mismatch.rejection_detail  # type: ignore[operator]
+        assert "Acme Coffee" in res_mismatch.rejection_detail  # type: ignore[operator]
+
+    def test_merchant_scope_missing_merchant(self) -> None:
+        coffee_rule = _make_rule(3, "coffee.5x", ScopeType.MERCHANT, merchant="Acme Coffee")
+        p_no_merchant = _make_purchase(category="dining", merchant=None)
+
+        res = check_rule_applicability(coffee_rule, p_no_merchant)
+
+        assert res.is_applicable is False
+        assert res.rejection_reason == "missing_merchant"
+        assert "no merchant specified" in res.rejection_detail  # type: ignore[operator]
+
+    def test_scope_case_and_whitespace_normalization(self) -> None:
+        cat_rule = _make_rule(4, "cat.norm", ScopeType.CATEGORY, category="  Dining  ")
+        p_cat = _make_purchase(category="DINING")
+
+        merch_rule = _make_rule(5, "merch.norm", ScopeType.MERCHANT, merchant="  Acme Coffee  ")
+        p_merch = _make_purchase(category="dining", merchant="acme coffee")
+
+        assert check_rule_applicability(cat_rule, p_cat).is_applicable is True
+        assert check_rule_applicability(merch_rule, p_merch).is_applicable is True
+
+
+class TestExclusionMatching:
+    """Tests for AC-4 category, merchant, and merchant-tag exclusions."""
+
+    def test_merchant_tag_exclusion_ac4(self) -> None:
+        """SPEC AC-4: Grocery 4x rule excluding warehouse-club merchants."""
+        exclusion = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT_TAG,
+            target="warehouse_club",
+            reason="Warehouse clubs excluded from grocery bonus",
+        )
+        grocery_rule = _make_rule(
+            id=10,
+            rule_key="grocery.4x",
+            scope_type=ScopeType.CATEGORY,
+            category="groceries",
+            exclusions=(exclusion,),
+            multiplier="4.0",
+        )
+
+        p_regular = _make_purchase(
+            category="groceries",
+            merchant="SuperFoods",
+            merchant_tags=("supermarket",),
+        )
+        p_warehouse = _make_purchase(
+            category="groceries",
+            merchant="Wholesale Club",
+            merchant_tags=("warehouse_club", "big_box"),
+        )
+
+        res_regular = check_rule_applicability(grocery_rule, p_regular)
+        res_warehouse = check_rule_applicability(grocery_rule, p_warehouse)
+
+        assert res_regular.is_applicable is True
+
+        assert res_warehouse.is_applicable is False
+        assert res_warehouse.rejection_reason == "merchant_tag_exclusion"
+        assert res_warehouse.matched_exclusion == exclusion
+        assert "Warehouse clubs excluded from grocery bonus" in res_warehouse.rejection_detail  # type: ignore[operator]
+
+    def test_category_exclusion(self) -> None:
+        exclusion = RuleExclusion(
+            exclusion_type=ExclusionType.CATEGORY,
+            target="gift_cards",
+            reason="Gift card category excluded",
+        )
+        base_rule = _make_rule(
+            id=1,
+            rule_key="base.with_ex",
+            scope_type=ScopeType.BASE,
+            exclusions=(exclusion,),
+        )
+
+        p_gift = _make_purchase(category="gift_cards")
+        p_other = _make_purchase(category="dining")
+
+        res_gift = check_rule_applicability(base_rule, p_gift)
+        res_other = check_rule_applicability(base_rule, p_other)
+
+        assert res_gift.is_applicable is False
+        assert res_gift.rejection_reason == "category_exclusion"
+        assert res_gift.matched_exclusion == exclusion
+        assert "Gift card category excluded" in res_gift.rejection_detail  # type: ignore[operator]
+        assert res_other.is_applicable is True
+
+    def test_merchant_exclusion(self) -> None:
+        exclusion = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT,
+            target="Excluded Gas Co",
+            reason="Specific merchant excluded from gas rewards",
+        )
+        gas_rule = _make_rule(
+            id=20,
+            rule_key="gas.3x",
+            scope_type=ScopeType.CATEGORY,
+            category="gas",
+            exclusions=(exclusion,),
+        )
+
+        p_ex = _make_purchase(category="gas", merchant="Excluded Gas Co")
+        p_ok = _make_purchase(category="gas", merchant="Clean Fuel Co")
+
+        res_ex = check_rule_applicability(gas_rule, p_ex)
+        res_ok = check_rule_applicability(gas_rule, p_ok)
+
+        assert res_ex.is_applicable is False
+        assert res_ex.rejection_reason == "merchant_exclusion"
+        assert res_ex.matched_exclusion == exclusion
+        assert res_ok.is_applicable is True
+
+    def test_exclusion_case_and_whitespace_normalization(self) -> None:
+        exclusion = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT_TAG,
+            target="  Warehouse_Club  ",
+            reason="Warehouse excluded",
+        )
+        rule = _make_rule(
+            id=10,
+            rule_key="norm.ex",
+            scope_type=ScopeType.BASE,
+            exclusions=(exclusion,),
+        )
+        p = _make_purchase(category="groceries", merchant_tags=("WAREHOUSE_CLUB",))
+
+        res = check_rule_applicability(rule, p)
+        assert res.is_applicable is False
+        assert res.rejection_reason == "merchant_tag_exclusion"
+
+    def test_multiple_matching_exclusions_first_match_wins(self) -> None:
+        """When multiple exclusions match, the first defined exclusion wins deterministically."""
+        ex1 = RuleExclusion(
+            exclusion_type=ExclusionType.CATEGORY,
+            target="dining",
+            reason="Dining category excluded (first exclusion)",
+        )
+        ex2 = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT_TAG,
+            target="sit_down",
+            reason="Sit down tag excluded (second exclusion)",
+        )
+        rule = _make_rule(
+            id=15,
+            rule_key="multi.ex",
+            scope_type=ScopeType.BASE,
+            exclusions=(ex1, ex2),
+        )
+
+        # Purchase matches both category ('dining') and merchant tag ('sit_down')
+        purchase = _make_purchase(category="dining", merchant_tags=("sit_down",))
+        res = check_rule_applicability(rule, purchase)
+
+        assert res.is_applicable is False
+        assert res.rejection_reason == "category_exclusion"
+        assert res.matched_exclusion == ex1
+        assert "Dining category excluded (first exclusion)" in (res.rejection_detail or "")
+
+    def test_empty_exclusion_target_or_empty_tag_does_not_match(self) -> None:
+        """Empty or whitespace-only exclusion targets and empty tags do not cause false matches."""
+        empty_ex = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT_TAG,
+            target="   ",
+            reason="Empty exclusion target",
+        )
+        rule = _make_rule(
+            id=16,
+            rule_key="empty.target",
+            scope_type=ScopeType.BASE,
+            exclusions=(empty_ex,),
+        )
+
+        # Purchase with empty string tag and normal category
+        purchase = _make_purchase(category="dining", merchant_tags=("", "fast_food"))
+        res = check_rule_applicability(rule, purchase)
+
+        assert res.is_applicable is True
+        assert res.rejection_reason is None
+
+
+class TestPrecedenceAndCombinedEvaluation:
+    """Tests for scope check precedence over exclusions."""
+
+    def test_scope_mismatch_precedes_exclusions(self) -> None:
+        """When scope does not match, return scope mismatch without evaluating exclusions."""
+        exclusion = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT_TAG,
+            target="warehouse_club",
+            reason="Warehouse tag excluded",
+        )
+        travel_rule = _make_rule(
+            id=5,
+            rule_key="travel.5x",
+            scope_type=ScopeType.CATEGORY,
+            category="travel",
+            exclusions=(exclusion,),
+        )
+        # Purchase is groceries (mismatch) AND has warehouse_club tag
+        purchase = _make_purchase(category="groceries", merchant_tags=("warehouse_club",))
+
+        res = check_rule_applicability(travel_rule, purchase)
+
+        assert res.is_applicable is False
+        assert res.rejection_reason == "category_mismatch"
+        assert res.matched_exclusion is None
+
+
+class TestBatchFilterApplicableRules:
+    """Tests for filter_applicable_rules and trace step generation."""
+
+    def test_filters_rules_and_preserves_order(self) -> None:
+        p = _make_purchase(
+            category="dining",
+            merchant="Acme Bistro",
+            merchant_tags=("sit_down",),
+        )
+
+        # r1: category matches (dining) -> applicable
+        r1 = _make_rule(1, "dining.cat", ScopeType.CATEGORY, category="dining")
+        # r2: category mismatch (groceries) -> rejected
+        r2 = _make_rule(2, "groceries.cat", ScopeType.CATEGORY, category="groceries")
+        # r3: merchant matches (Acme Bistro) -> applicable
+        r3 = _make_rule(3, "bistro.merch", ScopeType.MERCHANT, merchant="Acme Bistro")
+        # r4: base scope with sit_down exclusion -> rejected
+        ex = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT_TAG,
+            target="sit_down",
+            reason="Sit-down restaurants excluded from quick-pay",
+        )
+        r4 = _make_rule(4, "base.ex", ScopeType.BASE, exclusions=(ex,))
+        # r5: standard base scope -> applicable
+        r5 = _make_rule(5, "base.std", ScopeType.BASE)
+
+        rules = (r1, r2, r3, r4, r5)
+        applicable, rejection_traces = filter_applicable_rules(rules, p)
+
+        # 1. Surviving applicable rules preserve input order
+        assert applicable == (r1, r3, r5)
+        assert [r.id for r in applicable] == [1, 3, 5]
+
+        # 2. Rejection traces generated in order for rejected rules (r2, r4)
+        assert len(rejection_traces) == 2
+
+        t1, t2 = rejection_traces
+        assert t1.step_number == 1
+        assert t1.step_type == "applicability_filter"
+        assert t1.action == "rejected"
+        assert t1.rule_id == 2
+        assert t1.rule_key == "groceries.cat"
+        assert t1.reason == "category_mismatch"
+        assert "groceries" in t1.detail
+
+        assert t2.step_number == 2
+        assert t2.step_type == "applicability_filter"
+        assert t2.action == "rejected"
+        assert t2.rule_id == 4
+        assert t2.rule_key == "base.ex"
+        assert t2.reason == "merchant_tag_exclusion"
+        assert "Sit-down restaurants excluded from quick-pay" in t2.detail
+
+    def test_all_applicable_and_all_rejected(self) -> None:
+        p = _make_purchase(category="dining")
+        base1 = _make_rule(1, "base.1", ScopeType.BASE)
+        base2 = _make_rule(2, "base.2", ScopeType.BASE)
+
+        # All applicable
+        app_all, traces_empty = filter_applicable_rules((base1, base2), p)
+        assert app_all == (base1, base2)
+        assert traces_empty == ()
+
+        # All rejected
+        gas1 = _make_rule(3, "gas.1", ScopeType.CATEGORY, category="gas")
+        gas2 = _make_rule(4, "gas.2", ScopeType.CATEGORY, category="gas")
+        app_none, traces_all = filter_applicable_rules((gas1, gas2), p)
+        assert app_none == ()
+        assert len(traces_all) == 2
+
+    def test_empty_rules_input(self) -> None:
+        p = _make_purchase()
+        app_empty, traces_empty = filter_applicable_rules((), p)
+        assert app_empty == ()
+        assert traces_empty == ()

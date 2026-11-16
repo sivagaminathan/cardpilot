@@ -3,6 +3,11 @@
 No DB, network, clock, or randomness side effects.
 """
 
+from app.engine.applicability import (
+    ApplicabilityResult,
+    check_rule_applicability,
+    filter_applicable_rules,
+)
 from app.engine.effective import (
     create_no_effective_rule_evaluation,
     filter_effective_rules,
@@ -32,6 +37,7 @@ from app.engine.types import (
 )
 
 __all__ = [
+    "ApplicabilityResult",
     "AppliedPortion",
     "Cap",
     "CardContext",
@@ -52,7 +58,9 @@ __all__ = [
     "TraceStep",
     "UnrankedReason",
     "Valuation",
+    "check_rule_applicability",
     "create_no_effective_rule_evaluation",
+    "filter_applicable_rules",
     "filter_effective_rules",
     "is_rule_effective",
 ]

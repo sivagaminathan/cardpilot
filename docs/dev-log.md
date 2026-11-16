@@ -280,3 +280,48 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `npm test --prefix frontend -- --run`: 9 passed in 3.46s.
 - **Acceptance Criteria [Done when]:**
   - Effective-date filter with inclusive boundaries and AC-6 version transition tests passing. Satisfied.
+
+
+### Task T10: Applicability Scope Matching & Exclusions (AC-4)
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** Implement pure rule applicability evaluation covering scope matching (`BASE`, `CATEGORY`, `MERCHANT`) and rule exclusions (`CATEGORY`, `MERCHANT`, `MERCHANT_TAG`) with stable rejection reasons and trace generation per SPEC AC-4 and ARCHITECTURE §4.2 step 2.
+- **Implementation Details:**
+  - Created `backend/app/engine/applicability.py`:
+    - `ApplicabilityResult`: Frozen, slotted structure holding `is_applicable`, `rejection_reason`, `rejection_detail`, and `matched_exclusion`.
+    - `_normalize`: String normalization using `.strip().casefold()` for robust, case-insensitive comparison across categories, merchants, and tags.
+    - Scope matching:
+      - `BASE`: Matches all purchases.
+      - `CATEGORY`: Evaluates category equality; emits `category_mismatch` on divergence.
+      - `MERCHANT`: Distinguishes `missing_merchant` (when purchase has no merchant) from `merchant_mismatch` (divergent merchants).
+    - Exclusion matching:
+      - Evaluates `CATEGORY`, `MERCHANT`, and `MERCHANT_TAG` exclusions in order.
+      - Preserves configured exclusion reasons and attaches matched exclusion to the result.
+      - Evaluated for all matching scopes including `BASE`.
+    - `check_rule_applicability(rule, purchase)`: Evaluates scope first; if scope fails, returns immediately without checking exclusions; otherwise checks exclusions.
+    - `filter_applicable_rules(rules, purchase)`: Filters applicable rules while strictly preserving input order, and generates structured `TraceStep` records for all rejected rules with step numbers, rule metadata, and explanatory details.
+  - Exported `ApplicabilityResult`, `check_rule_applicability`, and `filter_applicable_rules` from `backend/app/engine/__init__.py`.
+  - Implemented unit tests in `backend/tests/engine/test_applicability.py`:
+    - Base, category, and merchant scope matches.
+    - Category mismatch, merchant mismatch, and missing merchant scenarios.
+    - Case-insensitive and whitespace-normalized comparisons.
+    - Category, merchant, and merchant-tag exclusions (SPEC AC-4 grocery 4x excluding warehouse clubs).
+    - Preservation of configured exclusion reasons.
+    - Multiple matching exclusions asserting deterministic first-match behavior.
+    - Empty exclusion target and empty merchant tag protection against false matches.
+    - Scope mismatch precedence over exclusions.
+    - Multiple rule filtering with input order preservation and trace generation.
+    - Empty rule list, all-applicable, and all-rejected edge cases.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Instructed narrow T10 scope focusing strictly on scope matching and exclusions with rejection reasons; reviewed implementation and approved targeted hardening for empty target guarding and multiple matching exclusions.
+  - **AI Executed:** Followed test-first TDD, implemented pure domain logic, added targeted tests, and verified all static and dynamic checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine`: 51 passed in 0.30s (including AST zero-float check across all engine files).
+  - `uv run --directory backend --extra dev pytest`: 57 passed in 0.46s (full backend suite).
+  - `uv run --directory backend --extra dev mypy app/engine`: Success: no issues found in 4 source files (`mypy --strict`).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 17 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 31 files already formatted.
+  - `npm test --prefix frontend -- --run`: 9 passed in 4.80s.
+- **Acceptance Criteria [Done when]:**
+  - Scope matching (category/merchant/base) and exclusions with rejection reasons implemented and tested against AC-4. Satisfied.
