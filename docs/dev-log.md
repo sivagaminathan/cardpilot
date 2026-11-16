@@ -719,3 +719,17 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Fictional YAML seed catalog (≥6 products, currencies, categories, merchants, sources, rules with superseded/capped/exclusion/threshold examples, and benefits) validated against SPEC §4.2. Satisfied.
+
+## Deployment Task 1 — Neon Database URL Compatibility (2026-11-16)
+- **What was done:**
+  - Added `normalize_database_url()` in `backend/app/config.py` and wired it via a Pydantic `@field_validator("database_url", mode="before")` on `Settings` so `get_settings().database_url` and `app/db.py` always use a normalized `postgresql+asyncpg://` URL.
+  - Updated `get_database_url()` in `backend/alembic/env.py` to call `normalize_database_url()` (single shared helper, zero duplicated logic).
+  - Normalization converts `postgres://` and `postgresql://` to `postgresql+asyncpg://`, translates `sslmode=...` to `ssl=...` (when `ssl` is not already set), removes `channel_binding` (unsupported by `asyncpg 0.32.0`), preserves other query parameters, and raises `ValueError` without exposing credentials on invalid schemes or missing hosts.
+  - Added 12 unit tests in `backend/tests/test_config.py` verifying all URL formats, `PGDialect_asyncpg.create_connect_args()` compatibility against `inspect.signature(asyncpg.connect)`, credential non-leakage, and `Settings` normalization.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/test_config.py`: 12 passed in 0.16s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 265 passed (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 28 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 58 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).

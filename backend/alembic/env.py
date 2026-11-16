@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 import app.models  # noqa: F401 - register ORM models on Base.metadata
 from alembic import context
-from app.config import get_settings
+from app.config import get_settings, normalize_database_url
 from app.db import Base
 
 # this is the Alembic Config object, which provides
@@ -34,7 +34,7 @@ def get_database_url() -> str:
             url = ini_url
     if not url:
         url = get_settings().database_url
-    return url
+    return normalize_database_url(url)
 
 
 def run_migrations_offline() -> None:
