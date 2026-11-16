@@ -184,4 +184,4 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
     - `npm run build`: Production bundle built cleanly in 978ms.
     - `npm test`: 9 passed in 4.40s.
 - **Acceptance Criteria [Done when]:**
-  - Both jobs green on a PR. Workflow configured and verified locally; live GitHub Actions execution will trigger upon push/PR.
+  - Both jobs green on a PR/push. Satisfied on GitHub Actions (Run ID `43798948931` on `main`: Backend passed in 42s, Frontend passed in 37s).
