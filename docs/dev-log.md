@@ -545,3 +545,33 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Valuation → estimated value (`ROUND_HALF_EVEN`) and `no_valuation` routing to `UNRANKED` implemented and verified against AC-2. Satisfied.
+
+
+### Task T18: Cross-Card Ranking (Ranked / Unranked / Ineligible, Tie-Break, Global Notes)
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement pure cross-card ranking, tie-breaking, tie-explanation annotation, and global notes per BACKLOG T18, SPEC AC-2/AC-10, and ARCHITECTURE §4.3.
+- **Implementation Details:**
+  - Created `backend/app/engine/ranking.py`:
+    - `RankingResult`: Frozen, slotted dataclass holding immutable tuples `ranked`, `unranked`, `ineligible`, and `global_notes`.
+    - `rank_card_evaluations(evaluations)`:
+      - Validates `CardStatus` / `estimated_value_cents` consistency without silently repairing invalid states.
+      - Partitions by `CardStatus` (`RANKED`, `UNRANKED`, `INELIGIBLE`).
+      - Sorts `ranked` by `(-estimated_value_cents, -reward_units, card_name.casefold(), card_name, card_id)` and appends `"Tied on estimated value."` via `dataclasses.replace` to every card in an `estimated_value_cents` tie group.
+      - Sorts `unranked` and `ineligible` deterministically by `(card_name.casefold(), card_name, card_id)` without ever ranking unranked cards by raw units/multipliers.
+      - Emits `GLOBAL_COMPARISON_NOTE` always, plus `NO_RANKABLE_CARDS_NOTE` when evaluated cards exist but none are ranked.
+  - Exported `GLOBAL_COMPARISON_NOTE`, `NO_RANKABLE_CARDS_NOTE`, `RankingResult`, and `rank_card_evaluations` from `backend/app/engine/__init__.py`.
+  - Added 6 unit tests in `backend/tests/engine/test_ranking.py` covering partitioning, descending value sort, tie-breaking by units/nickname/card_id, tie explanation injection without mutating inputs, non-tied cards, unranked/ineligible deterministic sorting, global notes across mixed/all-unranked/all-ineligible/empty inputs, inconsistent status/value rejection, immutability, and determinism.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Scoped T18 strictly to `rank_card_evaluations`, specified exact sort keys, sequential 1-based list ordering, replacement-based tie annotations, and exact `global_notes` rules.
+  - **AI Executed:** Followed test-first TDD, implemented pure cross-card ranking, verified all tests and static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_ranking.py tests/engine/test_no_float.py`: 8 passed in 0.22s.
+  - `uv run --directory backend --extra dev pytest`: 198 passed in 0.80s (with Compose `db` running).
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 10 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 23 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 43 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Cross-card ranking (ranked/unranked/ineligible partitioning, tie-break, global notes) implemented and verified against AC-2 and AC-10. Satisfied.

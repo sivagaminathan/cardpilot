@@ -22,6 +22,12 @@ from app.engine.periods import (
     PeriodBounds,
     get_period_bounds,
 )
+from app.engine.ranking import (
+    GLOBAL_COMPARISON_NOTE,
+    NO_RANKABLE_CARDS_NOTE,
+    RankingResult,
+    rank_card_evaluations,
+)
 from app.engine.selection import (
     SelectionResult,
     create_no_applicable_rule_evaluation,
@@ -60,6 +66,8 @@ from app.engine.valuation import (
 )
 
 __all__ = [
+    "GLOBAL_COMPARISON_NOTE",
+    "NO_RANKABLE_CARDS_NOTE",
     "ApplicabilityResult",
     "AppliedPortion",
     "Cap",
@@ -75,6 +83,7 @@ __all__ = [
     "PeriodBounds",
     "PostCapBehavior",
     "Purchase",
+    "RankingResult",
     "RoundingMode",
     "Rule",
     "RuleExclusion",
@@ -97,6 +106,7 @@ __all__ = [
     "filter_effective_rules",
     "get_period_bounds",
     "is_rule_effective",
+    "rank_card_evaluations",
     "select_best_rule",
     "sort_rules_by_selection_priority",
 ]
