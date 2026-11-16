@@ -249,3 +249,34 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
 - **Acceptance Criteria [Done when]:**
   - `mypy strict passes`: Verified (`app/engine` passed in strict mode with 0 errors).
   - `no float in package (test greps/AST)`: Verified by `tests/engine/test_no_float.py` passing with 0 violations.
+
+
+### Task T09: Effective-Date Filter (AC-6)
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** Implement pure effective-date filtering for earning rules (`is_rule_effective`, `filter_effective_rules`) and ineligible card evaluation when no rules are effective (`create_no_effective_rule_evaluation`) per SPEC AC-6 and ARCHITECTURE §4.2 step 1.
+- **Implementation Details:**
+  - Created `backend/app/engine/effective.py`:
+    - `is_rule_effective(rule: EarningRule, target_date: date) -> bool`: Evaluates inclusive range `effective_from <= target_date <= (effective_to or infinity)`.
+    - `filter_effective_rules(rules: Sequence[EarningRule], target_date: date) -> tuple[EarningRule, ...]`: Filters active rules while strictly preserving input order.
+    - `create_no_effective_rule_evaluation(card: CardContext, target_date: date, message: str | None = None) -> CardEvaluation`: Constructs an ineligible `CardEvaluation` with `CardStatus.INELIGIBLE`, `IneligibleReason.NO_EFFECTIVE_RULE`, 0 reward units, structured explanation, and trace step.
+  - Exported functions from `backend/app/engine/__init__.py`.
+  - Implemented unit tests in `backend/tests/engine/test_effective.py`:
+    - Inclusive boundaries: exactly on `effective_from`, one day before, within range, exactly on `effective_to`, one day after.
+    - Open-ended `effective_to is None` extending indefinitely into the future.
+    - SPEC AC-6 version transition: v1 through 2026-06-30 and v2 from 2026-07-01.
+    - Multiple rule filtering with input order preservation.
+    - Empty rule lists and none-effective outcomes producing standardized ineligible evaluations.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Instructed T09 implementation with narrow scope, strict adherence to T08 invariants, and verification before modifying files.
+  - **AI Executed:** Inspected T08 `CardEvaluation` invariants, followed test-first TDD, implemented pure functions, and verified all static and dynamic test suites.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine`: 35 passed in 0.14s (including AST no-float check).
+  - `uv run --directory backend --extra dev pytest`: 41 passed in 0.40s (full backend suite).
+  - `uv run --directory backend --extra dev mypy app/engine`: Success: no issues found in 3 source files (`mypy --strict`).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 16 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 29 files already formatted.
+  - `npm test --prefix frontend -- --run`: 9 passed in 3.46s.
+- **Acceptance Criteria [Done when]:**
+  - Effective-date filter with inclusive boundaries and AC-6 version transition tests passing. Satisfied.
