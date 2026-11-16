@@ -12,24 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend:
-    name: Backend (Lint, Typecheck, Test)
+  backend-quality:
+    name: Backend (Lint & Typecheck)
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: cardpilot
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout code
@@ -56,25 +41,8 @@ jobs:
       - name: Run type checker (mypy)
         run: python -m mypy backend
 
-      - name: Run database migrations (Alembic)
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cardpilot
-        run: |
-          cd backend
-          python -m alembic upgrade head
-
-      - name: Run backend tests and enforce engine branch coverage (pytest)
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cardpilot
-        run: >-
-          python -m pytest backend
-          --cov=app.engine
-          --cov-branch
-          --cov-fail-under=90
-          --cov-report=term-missing
-
-  frontend:
-    name: Frontend (Lint, Typecheck, Build, Test)
+  frontend-quality:
+    name: Frontend (Lint, Typecheck, Build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -100,5 +68,58 @@ jobs:
       - name: Run typecheck and production build (tsc + Vite)
         run: npm run build
 
-      - name: Run component tests (Vitest)
-        run: npm test
+  test:
+    name: Automated Tests (make test)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cardpilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify GNU Make is available
+        run: make --version
+
+      - name: Set up Python 3.11 and uv
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv and sync backend dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --directory backend --extra dev --frozen
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Run database migrations (Alembic)
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cardpilot
+        run: uv run --directory backend --extra dev alembic upgrade head
+
+      - name: Run backend and frontend tests (make test)
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cardpilot
+        run: make test
