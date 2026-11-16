@@ -575,3 +575,28 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Cross-card ranking (ranked/unranked/ineligible partitioning, tie-break, global notes) implemented and verified against AC-2 and AC-10. Satisfied.
+
+
+### Task T19: Explanation Renderer (Trace → Sentences) with Golden-Text Tests
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement pure deterministic explanation renderer converting `TraceStep` sequences to human-readable sentences with golden-text tests per BACKLOG T19, SPEC FR-15/NFR-3, and ARCHITECTURE §4.2 step 7.
+- **Implementation Details:**
+  - Created `backend/app/engine/explain.py`:
+    - `render_trace_step(step)`: Maps known `step_type`s (`effective_filter`, `applicability_filter`, `selection`, `cap_allocation`, `units_calculation`, `valuation`) to approved stage prefixes (`Effective check:`, `Applicability:`, `Selection:`, `Cap allocation:`, `Units:`, `Valuation:`), preserves `step.detail`, appends `(rule '<rule_key>')` only when `rule_key` is missing from `detail`, normalizes punctuation to a single trailing period, and falls back deterministically for unknown `step_type` or empty `detail`.
+    - `render_explanation(trace)`: Preserves caller's exact sequence order (no sorting by `step_number`), normalizes sequences via `_normalize_sequence` (rejecting sets), and returns `tuple[str, ...]`.
+  - Exported `render_trace_step` and `render_explanation` from `backend/app/engine/__init__.py`.
+  - Added 11 golden-text and unit tests in `backend/tests/engine/test_explain.py` using actual engine `TraceStep` outputs covering happy path, AC-5 cap straddle + fallback, AC-4/AC-7/T15 applicability exclusions + thresholds, cap exhaustion + unallocated remainder, AC-2 no-valuation routing, AC-6/no-applicable-rule ineligible outcomes, unknown `step_type` / empty `detail` fallback, duplicate `step_number` order preservation, punctuation hygiene, empty input, set rejection, and determinism.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Approved preserving caller trace sequence order and using exact stage prefixes (`Effective check:`, `Applicability:`, `Selection:`, `Cap allocation:`, `Units:`, `Valuation:`).
+  - **AI Executed:** Followed test-first TDD, implemented pure trace-to-sentence renderer, wrote golden-text tests against actual engine outputs, and verified all static and dynamic checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_explain.py tests/engine/test_no_float.py`: 13 passed in 0.20s.
+  - `uv run --directory backend --extra dev pytest`: 209 passed in 0.87s (with Compose `db` running).
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 11 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 24 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 45 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Explanation renderer (trace → sentences) with golden-text tests implemented and verified against FR-15 and NFR-3. Satisfied.

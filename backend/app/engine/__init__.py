@@ -18,6 +18,10 @@ from app.engine.effective import (
     filter_effective_rules,
     is_rule_effective,
 )
+from app.engine.explain import (
+    render_explanation,
+    render_trace_step,
+)
 from app.engine.periods import (
     PeriodBounds,
     get_period_bounds,
@@ -107,6 +111,8 @@ __all__ = [
     "get_period_bounds",
     "is_rule_effective",
     "rank_card_evaluations",
+    "render_explanation",
+    "render_trace_step",
     "select_best_rule",
     "sort_rules_by_selection_priority",
 ]
