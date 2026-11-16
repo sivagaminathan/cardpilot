@@ -126,6 +126,87 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   border-radius: var(--radius-sm);
 }
 
+.backend-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  margin-left: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.backend-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.backend-status--loading {
+  background-color: var(--gray-100);
+  color: var(--gray-700);
+  border-color: var(--gray-300);
+}
+
+.backend-status--loading .backend-status-dot {
+  background-color: var(--gray-500);
+  animation: pulse-dot 1.5s infinite;
+}
+
+.backend-status--connected {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.backend-status--connected .backend-status-dot {
+  background-color: #10b981;
+}
+
+.backend-status--disconnected {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.backend-status--disconnected .backend-status-dot {
+  background-color: #ef4444;
+}
+
+.backend-status-retry {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  font-size: 0.85rem;
+  color: inherit;
+  line-height: 1;
+  opacity: 0.75;
+  border-radius: var(--radius-sm);
+}
+
+.backend-status-retry:hover,
+.backend-status-retry:focus-visible {
+  opacity: 1;
+  outline: 2px solid currentColor;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
 .profile-selector-container {
   display: flex;
   align-items: center;

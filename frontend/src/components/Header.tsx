@@ -1,5 +1,6 @@
 import React from 'react';
 import { DEMO_PROFILES } from '../types/profile';
+import { BackendStatus } from './BackendStatus';
 
 interface HeaderProps {
   currentProfileId: string;
@@ -23,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="brand-icon" aria-hidden="true">💳</span>
           <h1 className="brand-title">CardPilot</h1>
           <span className="version-tag">v0.1.0</span>
+          <BackendStatus />
         </div>
 
         <div className="profile-selector-container">

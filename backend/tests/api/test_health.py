@@ -44,4 +44,3 @@ def test_not_found_problem_details(client: TestClient) -> None:
     assert "title" in data
     assert "instance" in data
     assert data["instance"] == "/nonexistent-endpoint"
-

@@ -56,9 +56,7 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
     )
 
 
-async def validation_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle request validation errors with problem details."""
     if not isinstance(exc, RequestValidationError):
         return await http_exception_handler(request, exc)

@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from './App';
+import { BackendStatus } from './components/BackendStatus';
 import { formatCentsToUsd } from './lib/formatters';
 
 describe('formatCentsToUsd helper', () => {
@@ -19,15 +20,30 @@ describe('formatCentsToUsd helper', () => {
 });
 
 describe('CardPilot App and Dashboard', () => {
-  it('renders application brand, header, and demo disclaimer banner', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', version: '0.1.0' }),
+    } as Response);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders application brand, header, and demo disclaimer banner', async () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { level: 1, name: /CardPilot/i })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: /Demo Disclaimer/i })).toBeInTheDocument();
     expect(screen.getByText(/DEMO DATA ONLY/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('API Connected')).toBeInTheDocument();
+    });
   });
 
-  it('renders default profile portfolio cards and benefit alerts for Maya', () => {
+  it('renders default profile portfolio cards and benefit alerts for Maya', async () => {
     render(<App />);
 
     // Default profile check
@@ -42,9 +58,13 @@ describe('CardPilot App and Dashboard', () => {
     const alertHeading = screen.getByRole('heading', { level: 3, name: /Upcoming Benefit Resets/i });
     expect(alertHeading).toBeInTheDocument();
     expect(screen.getByText('Annual Hotel Statement Credit')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('API Connected')).toBeInTheDocument();
+    });
   });
 
-  it('updates dashboard portfolio and alerts when switching demo profile', () => {
+  it('updates dashboard portfolio and alerts when switching demo profile', async () => {
     render(<App />);
 
     const select = screen.getByLabelText(/Select demo profile/i);
@@ -55,9 +75,13 @@ describe('CardPilot App and Dashboard', () => {
     expect(screen.getByRole('heading', { level: 4, name: 'Platinum Lux' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 4, name: 'Grocery Gold' })).toBeInTheDocument();
     expect(screen.getByText('Monthly Dining Statement Credit')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('API Connected')).toBeInTheDocument();
+    });
   });
 
-  it('navigates to placeholder views and returns to dashboard', () => {
+  it('navigates to placeholder views and returns to dashboard', async () => {
     render(<App />);
 
     // Click Compare navigation button
@@ -71,5 +95,55 @@ describe('CardPilot App and Dashboard', () => {
     fireEvent.click(returnButton);
 
     expect(screen.getByRole('heading', { level: 2, name: /Cardholder Portfolio Overview/i })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('API Connected')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('BackendStatus component', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('displays API Connected when /healthz returns ok', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ status: 'ok', version: '0.1.0' }),
+    } as Response);
+
+    render(<BackendStatus />);
+
+    await waitFor(() => {
+      expect(screen.getByText('API Connected')).toBeInTheDocument();
+    });
+  });
+
+  it('displays API Offline when /healthz fetch fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
+
+    render(<BackendStatus />);
+
+    await waitFor(() => {
+      expect(screen.getByText('API Offline')).toBeInTheDocument();
+    });
+  });
+
+  it('displays API Offline when /healthz returns non-200', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+    } as Response);
+
+    render(<BackendStatus />);
+
+    await waitFor(() => {
+      expect(screen.getByText('API Offline')).toBeInTheDocument();
+    });
   });
 });

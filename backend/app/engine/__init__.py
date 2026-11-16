@@ -2,4 +2,3 @@
 
 No DB, network, clock, or randomness side effects.
 """
-

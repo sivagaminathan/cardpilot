@@ -95,3 +95,34 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `npm run build`: `tsc && vite build` built in 885ms (`dist/index.html`, `dist/assets/`).
 - **Acceptance Criteria [Done when]:**
   - `npm test`, `npm run lint`, `npm run build` pass. Satisfied.
+
+### Task T04: Docker Compose Stack, Dockerfiles, and Makefile (In Progress / Repaired)
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** Docker Compose wiring `db` (Postgres 16) + `api` (FastAPI backend) + `web` (Vite frontend); `.env`-driven configuration; Makefile targets; optional observability profile; frontend-to-backend `/healthz` connectivity.
+- **Implementation & Repair Details:**
+  - `docker-compose.yml`: Configured core services (`db`, `api`, `web`) with health checks, volume mounts, and Compose Watch (`develop.watch`). Set `.env` to `required: false` with sensible environment defaults so `docker compose config` works out of the box on a fresh clone. Added `API_TARGET: http://api:8000` to `web` container.
+  - `frontend/vite.config.ts`: Configured Vite proxying for `/healthz` and `/api` targeting the backend (`API_TARGET || http://localhost:8000`).
+  - `frontend/src/components/BackendStatus.tsx`: Implemented live backend connection indicator component that actively probes `/healthz`, displays loading / connected / disconnected states, provides a retry trigger, and adheres to accessibility standards (`role="status"`, `aria-live="polite"`). Integrated into header brand bar.
+  - `frontend/src/App.test.tsx`: Expanded Vitest test suite to verify `/healthz` connected and disconnected states using fetch spies.
+  - `backend/Dockerfile` & `backend/README.md`: Added package `README.md` to satisfy `pyproject.toml` metadata and fixed copying order before `pip install -e .`.
+  - `backend/.dockerignore`: Excludes Python caches, `.venv`, `.env`, test artifacts, and build outputs.
+  - `frontend/Dockerfile`: `node:22-alpine` base with `npm ci`, source copying, and Vite dev server.
+  - `frontend/.dockerignore`: Excludes `node_modules/`, `dist/`, `.env`, and local caches.
+  - `observability/`: Configured OTel Collector, Prometheus scraping, Grafana datasource provisioning, Tempo tracing, and updated `observability/loki.yaml` for Loki 3.3.1 compatibility (`store: tsdb`, `schema: v13`).
+  - `Makefile`: Targets for development (`dev`, `dev-obs`, `down`, `down-v`), testing (`test`, `test-be`, `test-fe`), linting (`lint`, `lint-be`, `lint-fe`), and `/healthz` probe.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Directed focused repair pass for T04 addressing Docker Compose environment handling, frontend/backend connectivity, Dockerfile ordering, Loki 3.x configuration, and Ruff formatting. Enforced AGENTS.md Hard Rule #10 against fabricated test claims.
+  - **AI Executed:** Authored fixes across Compose, Dockerfiles, Vite proxy, BackendStatus UI component, Loki config, dev-log corrections, and executed all local verification suites.
+- **Verification & Testing (Actual Results):**
+  - `docker compose config`: Passed for default stack and `--profile observability`.
+  - `python -m pytest backend`: 4 passed in 0.13s.
+  - `python -m ruff check backend`: Passed (0 errors).
+  - `python -m ruff format --check backend`: Passed (20 files verified).
+  - `python -m mypy backend`: Passed (0 errors in 19 source files).
+  - `npm test -- --run` (in `frontend/`): 9 passed in 3.84s (0 warnings).
+  - `npm run lint` (in `frontend/`): Passed (0 errors, 0 warnings).
+  - `npm run build` (in `frontend/`): Passed (production bundle built in 780ms).
+- **Blockers & Outstanding Acceptance Criteria:**
+  - **Docker Desktop Status:** Docker daemon is currently not running on the host machine.
+  - **Acceptance Criteria [Done when]:** `docker compose up` serves web, which calls `/healthz` successfully. Container build and runtime execution require Docker Desktop to be started; runtime verification remains pending daemon availability.
