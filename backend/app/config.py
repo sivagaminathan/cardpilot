@@ -82,10 +82,34 @@ class Settings(BaseSettings):
     def _normalize_database_url(cls, value: str) -> str:
         return normalize_database_url(value)
 
+    # Observability (OpenTelemetry / OTLP)
+    otel_service_name: str = Field(default="cardpilot-api", alias="OTEL_SERVICE_NAME")
+    otel_exporter_otlp_endpoint: str | None = Field(
+        default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT"
+    )
+    otel_exporter_otlp_headers: str | None = Field(default=None, alias="OTEL_EXPORTER_OTLP_HEADERS")
+
     @property
     def cors_origin_list(self) -> list[str]:
         """Return CORS origins parsed as a list of strings."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def otlp_headers_dict(self) -> dict[str, str]:
+        """Parse comma-separated ``Key=Value`` OTLP headers without logging values."""
+        if not self.otel_exporter_otlp_headers:
+            return {}
+        headers: dict[str, str] = {}
+        for pair in self.otel_exporter_otlp_headers.split(","):
+            item = pair.strip()
+            if "=" not in item:
+                continue
+            key, val = item.split("=", 1)
+            k = key.strip()
+            v = val.strip()
+            if k:
+                headers[k] = v
+        return headers
 
 
 @lru_cache

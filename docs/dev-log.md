@@ -763,3 +763,21 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
 - **Validation:**
   - Parsed `.github/workflows/deploy.yml` with `yaml.safe_load` cleanly.
   - `git diff --check`: Clean.
+
+## Observability Task 3 — Backend Telemetry Implementation (2026-11-16)
+- **What was done:**
+  - Added OpenTelemetry + Prometheus dependencies (`prometheus-client`, `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-prometheus`, `opentelemetry-exporter-otlp-proto-http`, `opentelemetry-instrumentation-fastapi`, `opentelemetry-instrumentation-sqlalchemy`) to `backend/pyproject.toml` and synced `backend/uv.lock`.
+  - Added `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_EXPORTER_OTLP_HEADERS` (`otlp_headers_dict`) settings to `backend/app/config.py`.
+  - Implemented `backend/app/telemetry/setup.py` (exported in `backend/app/telemetry/__init__.py`) and wired it into `backend/app/main.py`:
+    - Structured JSON stdout logging (`JsonLogFormatter`) with `timestamp`, `level`, `logger`, `message`, `service`, `environment`, `request_id`, `trace_id`, `span_id`, and safe HTTP summary fields (no request bodies, auth headers, cookies, or DB URLs).
+    - `RequestTelemetryMiddleware` for `X-Request-ID` propagation/generation and OTel HTTP request count/duration recording using matched FastAPI route templates (`route.path` or `"unmatched"`, avoiding high-cardinality raw paths and excluding `/healthz`, `/readyz`, `/metrics`).
+    - Single-source OTel `MeterProvider` with `PrometheusMetricReader` serving `/metrics` and optional `PeriodicExportingMetricReader(OTLPMetricExporter)` when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+    - OTel `TracerProvider` (`FastAPIInstrumentor` + `SQLAlchemyInstrumentor`) and optional OTLP/HTTP trace & log export (`OTLPSpanExporter`, `OTLPLogExporter`).
+  - Added focused tests in `backend/tests/test_telemetry.py`.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/test_telemetry.py`: 4 passed in 0.16s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 269 passed in 8.82s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev mypy app tests/test_telemetry.py`: Success: no issues found in 30 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 60 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).

@@ -15,6 +15,7 @@ from app.api.errors import http_exception_handler, validation_exception_handler
 from app.api.routes import api_router
 from app.config import Settings, get_settings
 from app.db import check_db_health, close_engine
+from app.telemetry import setup_telemetry, shutdown_telemetry
 
 
 @asynccontextmanager
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup tasks
     yield
     # Shutdown tasks
+    shutdown_telemetry()
     await close_engine()
 
 
@@ -91,6 +93,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Mount versioned API routes
     app.include_router(api_router)
+
+    # Configure structured logging, /metrics, and OpenTelemetry tracing/metrics
+    setup_telemetry(app, app_settings)
 
     return app
 
