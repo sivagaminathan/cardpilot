@@ -456,3 +456,34 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Cap handling including straddle and fallback to base implemented and verified against AC-5. Satisfied.
+
+
+### Task T15: Period-Spend Threshold (No Retroactivity)
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement non-retroactive period-spend threshold (`min_period_spend_cents` / `threshold_period`) evaluation in the applicability pipeline per BACKLOG T15 and ARCHITECTURE §3 & §4.2 step 2.
+- **Implementation Details:**
+  - Updated `backend/app/engine/applicability.py`:
+    - Added `_check_period_spend_threshold(rule, spend_history)`: enforces that `min_period_spend_cents` and `threshold_period` are both set or both `None` (raising `ValueError` for partial config), requires `spend_history` when configured, looks up prior spend via `spend_history.get_threshold_spend(rule.threshold_period.value)`, passes when `prior_spend_cents >= rule.min_period_spend_cents`, and rejects with `"below_min_period_spend"` otherwise (never adding `purchase.amount_cents`).
+    - Added optional `spend_history: SpendHistory | None = None` to `check_rule_applicability` and `filter_applicable_rules`, preserving backward compatibility for callers without period thresholds.
+  - Updated `backend/app/engine/caps.py`:
+    - Passed `spend_history=spend_history` from `allocate_purchase_across_caps` into `filter_applicable_rules`.
+  - Added 13 unit tests in `backend/tests/engine/test_applicability.py` (`TestPeriodSpendThreshold`) and 1 integration test in `backend/tests/engine/test_caps.py`:
+    - No threshold configured without `spend_history`.
+    - Parametrized boundary and non-retroactivity cases (below, below-but-purchase-would-cross, exact, above).
+    - Period-specific lookup keys (`monthly`, `quarterly`, `calendar_year`, `card_year`) and shared lookup across two rules with the same period.
+    - `ValueError` for partial config (`min_period_spend_cents` without `threshold_period` and vice versa) and missing `spend_history`.
+    - Fallback rule selection via `select_best_rule` and cap-allocation integration.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Confirmed `rule.threshold_period.value` as `SpendHistory.get_threshold_spend` key, `ValueError` for partial config or missing `spend_history`, `"below_min_period_spend"` rejection reason, and optional `spend_history` parameter on applicability functions.
+  - **AI Executed:** Followed test-first TDD, implemented pure integer-cent period-spend threshold evaluation, wired `spend_history` into `caps.py`, and verified all tests and static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_applicability.py tests/engine/test_caps.py`: 51 passed in 0.16s.
+  - `uv run --directory backend --extra dev pytest`: 149 passed in 0.69s (includes `test_no_float.py`).
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 7 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 20 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 37 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Non-retroactive period-spend threshold implemented and verified in applicability and cap-allocation pipelines. Satisfied.

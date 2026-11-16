@@ -102,7 +102,9 @@ def allocate_purchase_across_caps(
     5. Records any unallocated remainder if no eligible fallback rule exists.
     """
     cap_map = _build_cap_map(caps)
-    initial_applicable_rules, _ = filter_applicable_rules(rules, purchase)
+    initial_applicable_rules, _ = filter_applicable_rules(
+        rules, purchase, spend_history=spend_history
+    )
     for rule in initial_applicable_rules:
         if rule.cap_group_key is not None and rule.cap_group_key not in cap_map:
             raise ValueError(

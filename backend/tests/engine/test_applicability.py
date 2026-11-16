@@ -8,6 +8,8 @@ precedence rules, order preservation, and rejection trace step generation.
 from datetime import date
 from decimal import Decimal
 
+import pytest
+
 from app.engine.applicability import (
     ApplicabilityResult,
     check_rule_applicability,
@@ -17,9 +19,11 @@ from app.engine.selection import select_best_rule
 from app.engine.types import (
     EarningRule,
     ExclusionType,
+    Period,
     Purchase,
     RuleExclusion,
     ScopeType,
+    SpendHistory,
 )
 
 
@@ -33,6 +37,8 @@ def _make_rule(
     multiplier: str = "1.0",
     priority: int = 0,
     min_transaction_cents: int | None = None,
+    min_period_spend_cents: int | None = None,
+    threshold_period: Period | None = None,
 ) -> EarningRule:
     """Helper to construct an EarningRule for applicability testing."""
     return EarningRule(
@@ -46,6 +52,8 @@ def _make_rule(
         merchant=merchant,
         priority=priority,
         min_transaction_cents=min_transaction_cents,
+        min_period_spend_cents=min_period_spend_cents,
+        threshold_period=threshold_period,
         exclusions=exclusions,
     )
 
@@ -464,6 +472,209 @@ class TestMinTransactionThreshold:
             assert res.rejection_detail is not None
             assert expected_purchase in res.rejection_detail
             assert expected_min in res.rejection_detail
+
+
+class TestPeriodSpendThreshold:
+    """Tests for non-retroactive period-spend threshold enforcement (T15)."""
+
+    def test_no_period_threshold_passes_without_spend_history(self) -> None:
+        rule = _make_rule(
+            id=30,
+            rule_key="dining.no_period_thresh",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+        )
+        purchase = _make_purchase(category="dining", amount_cents=500)
+
+        res = check_rule_applicability(rule, purchase, spend_history=None)
+
+        assert res.is_applicable is True
+        assert res.rejection_reason is None
+
+    @pytest.mark.parametrize(
+        ("prior_spend", "purchase_amount", "min_period_spend", "expected_applicable"),
+        [
+            # Below threshold
+            (99999, 500, 100000, False),
+            # Below threshold even though prior + current >= threshold (no retroactivity)
+            (90000, 20000, 100000, False),
+            # Exactly at threshold
+            (100000, 500, 100000, True),
+            # Above threshold
+            (150000, 500, 100000, True),
+        ],
+    )
+    def test_period_spend_threshold_boundaries_and_no_retroactivity(
+        self,
+        prior_spend: int,
+        purchase_amount: int,
+        min_period_spend: int,
+        expected_applicable: bool,
+    ) -> None:
+        rule = _make_rule(
+            id=31,
+            rule_key="dining.unlocked_4x",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_period_spend_cents=min_period_spend,
+            threshold_period=Period.CALENDAR_YEAR,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=purchase_amount)
+        history = SpendHistory(threshold_spend_cents={"calendar_year": prior_spend})
+
+        res = check_rule_applicability(rule, purchase, spend_history=history)
+
+        assert res.is_applicable is expected_applicable
+        if expected_applicable:
+            assert res.rejection_reason is None
+            assert res.rejection_detail is None
+        else:
+            assert res.rejection_reason == "below_min_period_spend"
+            assert res.rejection_detail is not None
+            assert str(prior_spend) in res.rejection_detail
+            assert str(min_period_spend) in res.rejection_detail
+
+    @pytest.mark.parametrize(
+        ("period", "expected_key"),
+        [
+            (Period.MONTHLY, "monthly"),
+            (Period.QUARTERLY, "quarterly"),
+            (Period.CALENDAR_YEAR, "calendar_year"),
+            (Period.CARD_YEAR, "card_year"),
+        ],
+    )
+    def test_different_periods_use_period_specific_lookup_keys(
+        self,
+        period: Period,
+        expected_key: str,
+    ) -> None:
+        rule = _make_rule(
+            id=32,
+            rule_key=f"dining.{expected_key}",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_period_spend_cents=50000,
+            threshold_period=period,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=1000)
+
+        # Populate only the target period key above threshold; all other keys are 0
+        history_match = SpendHistory(threshold_spend_cents={expected_key: 50000})
+        assert check_rule_applicability(rule, purchase, spend_history=history_match).is_applicable
+
+        # Populate a different period key; target period key defaults to 0 -> rejected
+        other_key = "monthly" if expected_key != "monthly" else "quarterly"
+        history_other = SpendHistory(threshold_spend_cents={other_key: 100000})
+        res_other = check_rule_applicability(rule, purchase, spend_history=history_other)
+        assert res_other.is_applicable is False
+        assert res_other.rejection_reason == "below_min_period_spend"
+
+    def test_two_rules_with_same_period_share_lookup(self) -> None:
+        r_dining = _make_rule(
+            id=33,
+            rule_key="dining.tier2",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_period_spend_cents=50000,
+            threshold_period=Period.QUARTERLY,
+        )
+        r_base = _make_rule(
+            id=34,
+            rule_key="base.tier2",
+            scope_type=ScopeType.BASE,
+            min_period_spend_cents=40000,
+            threshold_period=Period.QUARTERLY,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=1000)
+        history = SpendHistory(threshold_spend_cents={"quarterly": 45000})
+
+        applicable, traces = filter_applicable_rules(
+            (r_dining, r_base), purchase, spend_history=history
+        )
+
+        assert applicable == (r_base,)
+        assert len(traces) == 1
+        assert traces[0].rule_id == 33
+        assert traces[0].reason == "below_min_period_spend"
+
+    def test_partial_threshold_configuration_raises_value_error(self) -> None:
+        purchase = _make_purchase(category="dining")
+        history = SpendHistory(threshold_spend_cents={"monthly": 50000})
+
+        rule_no_period = _make_rule(
+            id=35,
+            rule_key="bad.no_period",
+            scope_type=ScopeType.BASE,
+            min_period_spend_cents=50000,
+            threshold_period=None,
+        )
+        with pytest.raises(ValueError, match="threshold_period"):
+            check_rule_applicability(rule_no_period, purchase, spend_history=history)
+
+        rule_no_amount = _make_rule(
+            id=36,
+            rule_key="bad.no_amount",
+            scope_type=ScopeType.BASE,
+            min_period_spend_cents=None,
+            threshold_period=Period.MONTHLY,
+        )
+        with pytest.raises(ValueError, match="min_period_spend_cents"):
+            check_rule_applicability(rule_no_amount, purchase, spend_history=history)
+
+    def test_threshold_configured_with_missing_spend_history_raises_value_error(self) -> None:
+        rule = _make_rule(
+            id=37,
+            rule_key="dining.needs_history",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_period_spend_cents=50000,
+            threshold_period=Period.CALENDAR_YEAR,
+        )
+        purchase = _make_purchase(category="dining")
+
+        with pytest.raises(ValueError, match="spend_history"):
+            check_rule_applicability(rule, purchase, spend_history=None)
+
+    def test_rejected_period_threshold_rule_allows_fallback_rule_to_win(self) -> None:
+        tier2_rule = _make_rule(
+            id=201,
+            rule_key="dining.tier2_5x",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            multiplier="5.0",
+            priority=10,
+            min_period_spend_cents=100000,
+            threshold_period=Period.CALENDAR_YEAR,
+        )
+        fallback_rule = _make_rule(
+            id=202,
+            rule_key="base.1x",
+            scope_type=ScopeType.BASE,
+            multiplier="1.0",
+            priority=0,
+        )
+        # Prior spend is $900; purchase is $200 (would reach $1,100, but no retroactivity)
+        purchase = _make_purchase(category="dining", amount_cents=20000)
+        history = SpendHistory(threshold_spend_cents={"calendar_year": 90000})
+
+        applicable, traces = filter_applicable_rules(
+            (tier2_rule, fallback_rule), purchase, spend_history=history
+        )
+
+        assert applicable == (fallback_rule,)
+        assert len(traces) == 1
+        assert traces[0].step_number == 1
+        assert traces[0].step_type == "applicability_filter"
+        assert traces[0].action == "rejected"
+        assert traces[0].rule_id == 201
+        assert traces[0].rule_key == "dining.tier2_5x"
+        assert traces[0].reason == "below_min_period_spend"
+        assert "$900.00" in traces[0].detail
+        assert "$1000.00" in traces[0].detail
+
+        selection = select_best_rule(applicable)
+        assert selection is not None
+        assert selection.winning_rule == fallback_rule
 
     def test_exact_minimum_threshold_passes(self) -> None:
         rule = _make_rule(

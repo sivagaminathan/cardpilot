@@ -35,6 +35,8 @@ def _make_rule(
     merchant: str | None = None,
     priority: int = 0,
     cap_group_key: str | None = None,
+    min_period_spend_cents: int | None = None,
+    threshold_period: Period | None = None,
 ) -> EarningRule:
     return EarningRule(
         id=id,
@@ -47,6 +49,8 @@ def _make_rule(
         merchant=merchant,
         priority=priority,
         cap_group_key=cap_group_key,
+        min_period_spend_cents=min_period_spend_cents,
+        threshold_period=threshold_period,
     )
 
 
@@ -442,3 +446,57 @@ class TestCapAllocation:
             CapPortion(rule=rule, amount_cents=0)
         with pytest.raises(ValueError, match="strictly positive"):
             CapPortion(rule=rule, amount_cents=-50)
+
+    def test_cap_allocation_enforces_period_spend_threshold_before_selection_and_caps(self) -> None:
+        """Threshold rule below prior spend is rejected before cap allocation; fallback wins."""
+        promo_rule = _make_rule(
+            id=1,
+            rule_key="dining.tier2_5x",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            multiplier="5.0",
+            cap_group_key="dining_q",
+            min_period_spend_cents=100000,
+            threshold_period=Period.CALENDAR_YEAR,
+        )
+        base_rule = _make_rule(
+            id=2,
+            rule_key="base.1x",
+            scope_type=ScopeType.BASE,
+            multiplier="1.0",
+        )
+        cap = SpendCap(cap_group_key="dining_q", cap_amount_cents=50000, period=Period.QUARTERLY)
+        purchase = _make_purchase(amount_cents=60000, category="dining")
+
+        # Prior spend $500 < $1000 threshold (even though $500 + $600 >= $1000): fallback wins
+        below_history = SpendHistory(
+            cap_spend_cents={"dining_q": 0},
+            threshold_spend_cents={"calendar_year": 50000},
+        )
+        res_below = allocate_purchase_across_caps(
+            purchase=purchase,
+            rules=(promo_rule, base_rule),
+            caps=(cap,),
+            spend_history=below_history,
+        )
+        assert res_below.unallocated_cents == 0
+        assert res_below.portions == (
+            CapPortion(rule=base_rule, amount_cents=60000, cap_group_key=None),
+        )
+
+        # Prior spend $1000 == $1000 threshold: promo rule qualifies and straddles $500 cap
+        at_history = SpendHistory(
+            cap_spend_cents={"dining_q": 0},
+            threshold_spend_cents={"calendar_year": 100000},
+        )
+        res_at = allocate_purchase_across_caps(
+            purchase=purchase,
+            rules=(promo_rule, base_rule),
+            caps=(cap,),
+            spend_history=at_history,
+        )
+        assert res_at.unallocated_cents == 0
+        assert res_at.portions == (
+            CapPortion(rule=promo_rule, amount_cents=50000, cap_group_key="dining_q"),
+            CapPortion(rule=base_rule, amount_cents=10000, cap_group_key=None),
+        )
