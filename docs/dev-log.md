@@ -325,3 +325,38 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `npm test --prefix frontend -- --run`: 9 passed in 4.80s.
 - **Acceptance Criteria [Done when]:**
   - Scope matching (category/merchant/base) and exclusions with rejection reasons implemented and tested against AC-4. Satisfied.
+
+
+### Task T11: Deterministic Rule Selection (AC-3, AC-13)
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement deterministic rule selection by specificity (`MERCHANT=3 > CATEGORY=2 > BASE=1`), priority descending, and rule ID ascending, including tie determinism, duplicate ID validation, selection traces, explanation, and no-applicable-rule ineligible evaluation per SPEC AC-3, AC-13, FR-12, and ARCHITECTURE §4.2 step 3.
+- **Implementation Details:**
+  - Created `backend/app/engine/selection.py`:
+    - `sort_rules_by_selection_priority(rules)`: Sorts applicable rules in deterministic winner-first order `(-specificity, -priority, id)`. Rejects duplicate rule IDs with `ValueError` to prevent silent input-order dependence.
+    - `SelectionResult`: Frozen, slotted dataclass holding `winning_rule`, `alternative_rules`, `trace_steps`, and `explanation`, normalizing collection fields to immutable tuples via `_normalize_sequence` and rejecting unordered sets.
+    - `select_best_rule(rules)`: Returns `None` on empty input; otherwise selects the winning rule and emits `TraceStep` entries (`step_type="selection"`, `action="selected"` for winner and `action="not_selected"` for alternatives) identifying loss reasons (`lower_specificity`, `lower_priority`, `rule_id_tie_break`) and a summary explanation naming winner and alternatives.
+    - `create_no_applicable_rule_evaluation(card, purchase, message=None)`: Produces `CardStatus.INELIGIBLE` with `IneligibleReason.NO_APPLICABLE_RULE`, 0 reward units, trace step, and non-empty explanation (empty/whitespace custom messages fall back to default; valid custom messages are trimmed).
+  - Exported `SelectionResult`, `sort_rules_by_selection_priority`, `select_best_rule`, and `create_no_applicable_rule_evaluation` from `backend/app/engine/__init__.py`.
+  - Implemented unit tests in `backend/tests/engine/test_selection.py`:
+    - Specificity ordering (`MERCHANT > CATEGORY > BASE`, SPEC AC-3).
+    - Priority descending (negative, zero, positive values).
+    - Rule ID ascending tie-break.
+    - Determinism across shuffled input permutations (SPEC AC-13).
+    - Duplicate rule ID rejection.
+    - Combined 5-rule scenario spanning all 3 specificity levels and multiple priorities.
+    - `SelectionResult` runtime immutability (list normalization, set rejection, mutation protection).
+    - Trace and explanation assertions for winner and every alternative tie-break reason.
+    - Empty input returning `None` and no-applicable-rule evaluation invariants.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Specified T11 selection contracts, duplicate ID determinism requirement, and final immutability hardening for `SelectionResult`.
+  - **AI Executed:** Followed test-first TDD, implemented pure selection logic, added immutability tests, and verified all static and dynamic checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_selection.py`: 14 passed in 0.19s.
+  - `uv run --directory backend --extra dev pytest`: 71 passed in 0.42s (full backend suite).
+  - `uv run --directory backend --extra dev mypy app/engine`: Success: no issues found in 5 source files (`mypy --strict`).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 18 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 33 files already formatted.
+- **Acceptance Criteria [Done when]:**
+  - Selection by specificity -> priority -> id and tie determinism implemented and verified against AC-3 and AC-13. Satisfied.

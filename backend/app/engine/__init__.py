@@ -13,6 +13,12 @@ from app.engine.effective import (
     filter_effective_rules,
     is_rule_effective,
 )
+from app.engine.selection import (
+    SelectionResult,
+    create_no_applicable_rule_evaluation,
+    select_best_rule,
+    sort_rules_by_selection_priority,
+)
 from app.engine.types import (
     AppliedPortion,
     Cap,
@@ -53,14 +59,18 @@ __all__ = [
     "Rule",
     "RuleExclusion",
     "ScopeType",
+    "SelectionResult",
     "SpendCap",
     "SpendHistory",
     "TraceStep",
     "UnrankedReason",
     "Valuation",
     "check_rule_applicability",
+    "create_no_applicable_rule_evaluation",
     "create_no_effective_rule_evaluation",
     "filter_applicable_rules",
     "filter_effective_rules",
     "is_rule_effective",
+    "select_best_rule",
+    "sort_rules_by_selection_priority",
 ]
