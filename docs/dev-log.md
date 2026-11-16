@@ -652,3 +652,23 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Reference table ORM models and reversible Alembic migration implemented and verified against real PostgreSQL. Satisfied.
+
+## T22 — Migrations & ORM for rules, exclusions, and caps (2026-11-16)
+- **What was done:**
+  - Implemented SQLAlchemy 2.0 ORM models in `backend/app/models/rules.py` and re-exported them in `backend/app/models/__init__.py`:
+    - `SpendCap` (`spend_caps`): unique `(card_product_id, cap_group_key)`, positive `cap_amount_cents`, `period` constrained to `monthly | quarterly | calendar_year | card_year`.
+    - `EarningRule` (`earning_rules`): unique `(rule_key, version)`, `version >= 1`, `scope_type` (`base | category | merchant`) with `ck_earning_rules_scope_target`, `Numeric(8, 4)` non-negative `multiplier`, `cap_id` FK (`ON DELETE RESTRICT`), `post_cap_behavior` (`fallback_to_base`), optional `min_transaction_cents > 0`, paired `(min_period_spend_cents, threshold_period)`, `rounding` (`floor_units | nearest_unit | none_4dp`), `effective_to >= effective_from`, `source_id` FK (`ON DELETE RESTRICT`), `last_reviewed_on`, `supersedes_id` self-FK (`ON DELETE SET NULL`), and PostgreSQL `btree_gist` `ExcludeConstraint` preventing overlapping inclusive `daterange(effective_from, effective_to, '[]')` per `rule_key`.
+    - `RuleExclusion` (`rule_exclusions`): `exclusion_type` (`category | merchant | merchant_tag`) with separate nullable typed target columns (`target_category_id`, `target_merchant_id`, `target_tag`) and `ck_rule_exclusions_target` enforcing exactly one matching target (and non-blank `target_tag`), plus `reason`.
+    - Immutability enforcement boundary: `SEMANTIC_RULE_COLUMNS`, `RuleImmutableError`, and `ensure_rule_mutable(rule, *, is_referenced_by_calc: bool)` documented and ready for calculation-reference wiring when `transaction_reward_calcs` is introduced in T23.
+  - Added reversible Alembic migration `backend/alembic/versions/1f98842cde08_add_rules_exclusions_and_caps.py` (including `CREATE EXTENSION IF NOT EXISTS btree_gist`).
+  - Added real-PostgreSQL integration tests in `backend/tests/db/test_rule_models.py` and updated `backend/tests/db/test_reference_models.py` (`expected.issubset(...)` for `Base.metadata.tables`).
+- **Verification & Testing (Actual Results):**
+  - `alembic upgrade head` -> `alembic downgrade -1` -> `alembic upgrade head`: succeeded cleanly against PostgreSQL 16.
+  - `uv run --directory backend --extra dev pytest tests/db/test_rule_models.py`: 8 passed in 1.91s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 241 passed in 7.12s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 27 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 53 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Rules, exclusions, and caps ORM models, `btree_gist` non-overlap constraint, immutability boundary, and reversible Alembic migration implemented and verified against real PostgreSQL. Satisfied.

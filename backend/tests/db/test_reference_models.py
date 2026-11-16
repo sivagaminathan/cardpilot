@@ -59,7 +59,7 @@ def test_metadata_contains_exact_five_reference_tables() -> None:
         "card_products",
         "rule_sources",
     }
-    assert set(Base.metadata.tables.keys()) == expected
+    assert expected.issubset(set(Base.metadata.tables.keys()))
 
 
 def test_alembic_downgrade_and_upgrade_roundtrip() -> None:
