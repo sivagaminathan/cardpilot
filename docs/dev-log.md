@@ -628,3 +628,27 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - ≥ 15 JSON golden fixture scenarios covering all Phase 2 ACs and ≥ 90% engine branch coverage enforced in CI. Satisfied.
+
+
+### Task T21: Migrations & ORM for Reference Tables
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement SQLAlchemy 2.0 ORM models and Alembic migration for the five reference tables (`reward_currencies`, `categories`, `merchants`, `card_products`, `rule_sources`) per BACKLOG T21 and ARCHITECTURE §2.1.
+- **Implementation Details:**
+  - Created `backend/app/models/reference.py` (`RewardCurrency`, `Category`, `Merchant`, `CardProduct`, `RuleSource`) using SQLAlchemy 2.0 `Mapped[]` / `mapped_column()`, integer cents, `Numeric(8, 4)`, `Date`, `postgresql.ARRAY(String(64))` (`default=list`, `server_default=text("'{}'")`), natural unique constraints (`reward_currencies.code`, `categories.code`, `merchants.name`, `(card_products.issuer_name, card_products.name)`, `rule_sources.title`), `ON DELETE SET NULL` for `merchants.default_category_id`, `ON DELETE RESTRICT` for `card_products.reward_currency_id`, and `CHECK` constraints (`kind`, `default_cents_per_unit > 0`, `annual_fee_cents >= 0`).
+  - Exported the five models in `backend/app/models/__init__.py` and imported `app.models` in `backend/alembic/env.py`.
+  - Generated Alembic migration `backend/alembic/versions/0e8ce330266b_add_reference_tables.py` (`upgrade` + `downgrade`).
+  - Added 6 real-PostgreSQL integration tests in `backend/tests/db/test_reference_models.py` verifying metadata, `alembic` downgrade/upgrade round-trip, independent `merchants.tags` defaults + nullable `default_category_id`, FK `SET NULL` / `RESTRICT`, unique constraints, and `CHECK` constraints.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Approved `ARRAY(String(64))` for `merchants.tags`, nullable `merchants.default_category_id` (`ON DELETE SET NULL`), and natural unique keys without `seed_key`.
+  - **AI Executed:** Implemented ORM models, generated and verified Alembic migration, wrote PostgreSQL tests, and ran full validation.
+- **Verification & Testing (Actual Results):**
+  - `alembic upgrade head` -> `alembic downgrade -1` -> `alembic upgrade head`: succeeded cleanly against PostgreSQL 16.
+  - `uv run --directory backend --extra dev pytest tests/db/test_reference_models.py`: 6 passed in 0.96s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 233 passed in 2.78s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 26 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 50 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Reference table ORM models and reversible Alembic migration implemented and verified against real PostgreSQL. Satisfied.
