@@ -62,10 +62,15 @@ jobs:
           cd backend
           python -m alembic upgrade head
 
-      - name: Run backend tests (pytest)
+      - name: Run backend tests and enforce engine branch coverage (pytest)
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cardpilot
-        run: python -m pytest backend
+        run: >-
+          python -m pytest backend
+          --cov=app.engine
+          --cov-branch
+          --cov-fail-under=90
+          --cov-report=term-missing
 
   frontend:
     name: Frontend (Lint, Typecheck, Build, Test)

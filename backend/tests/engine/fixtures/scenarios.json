@@ -1,0 +1,789 @@
+{
+  "scenarios": [
+    {
+      "id": "ac2_cross_currency_ranked",
+      "acs": ["AC-2", "AC-10"],
+      "description": "Cash-back 1.5% vs Points 3x with valuations ranked by estimated USD cents.",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 1,
+          "card_name": "Apex Cash",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {
+              "id": 101,
+              "rule_key": "apex.base",
+              "version": 1,
+              "scope_type": "base",
+              "multiplier": "1.5",
+              "effective_from": "2026-01-01"
+            }
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {
+            "reward_currency": "CASH_USD",
+            "cents_per_unit": "1.0",
+            "is_user_set": true
+          }
+        },
+        {
+          "card_id": 2,
+          "card_name": "Horizon Points",
+          "reward_currency": "HORIZON_PTS",
+          "rules": [
+            {
+              "id": 201,
+              "rule_key": "horizon.dining",
+              "version": 1,
+              "scope_type": "category",
+              "category": "dining",
+              "multiplier": "3.0",
+              "effective_from": "2026-01-01"
+            }
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {
+            "reward_currency": "HORIZON_PTS",
+            "cents_per_unit": "1.2",
+            "is_user_set": true
+          }
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 2,
+            "reward_currency": "HORIZON_PTS",
+            "reward_units": "300",
+            "estimated_value_cents": 360,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 201, "rule_version": 1, "multiplier": "3.0"}]
+          },
+          {
+            "card_id": 1,
+            "reward_currency": "CASH_USD",
+            "reward_units": "150",
+            "estimated_value_cents": 150,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 101, "rule_version": 1, "multiplier": "1.5"}]
+          }
+        ],
+        "unranked": [],
+        "ineligible": [],
+        "global_notes": [
+          "Annual fees and benefit credits are not included in this comparison."
+        ]
+      }
+    },
+    {
+      "id": "ac2_no_valuation_unranked",
+      "acs": ["AC-2", "AC-10"],
+      "description": "Points card without valuation is routed to unranked with limitation message.",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "travel",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 5,
+          "card_name": "Skyward Card",
+          "reward_currency": "Skyward Miles",
+          "rules": [
+            {
+              "id": 501,
+              "rule_key": "skyward.travel",
+              "version": 1,
+              "scope_type": "category",
+              "category": "travel",
+              "multiplier": "4.0",
+              "effective_from": "2026-01-01"
+            }
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": null
+        }
+      ],
+      "expected": {
+        "ranked": [],
+        "unranked": [
+          {
+            "card_id": 5,
+            "reward_currency": "Skyward Miles",
+            "reward_units": "400",
+            "estimated_value_cents": null,
+            "rejection_reason": "no_valuation",
+            "rejection_message": "No estimated value is set for Skyward Miles, so this card cannot be reliably compared in dollars. Set a valuation in Settings."
+          }
+        ],
+        "ineligible": [],
+        "global_notes": [
+          "Annual fees and benefit credits are not included in this comparison.",
+          "No cards can be ranked because none has an available estimated value."
+        ]
+      }
+    },
+    {
+      "id": "ac3_specificity_merchant_wins",
+      "acs": ["AC-3"],
+      "description": "Merchant 5x beats Dining 3x and Base 1x; explanation names winner and alternatives.",
+      "purchase": {
+        "amount_cents": 5000,
+        "category": "dining",
+        "merchant": "Acme Bistro",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 10,
+          "card_name": "Dining Plus",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "base.1x", "version": 1, "scope_type": "base", "multiplier": "1.0", "effective_from": "2026-01-01"},
+            {"id": 2, "rule_key": "dining.3x", "version": 1, "scope_type": "category", "category": "dining", "multiplier": "3.0", "effective_from": "2026-01-01"},
+            {"id": 3, "rule_key": "bistro.5x", "version": 1, "scope_type": "merchant", "merchant": "Acme Bistro", "multiplier": "5.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 10,
+            "reward_units": "250",
+            "estimated_value_cents": 250,
+            "applied_portions": [{"portion_cents": 5000, "rule_id": 3, "rule_version": 1, "multiplier": "5.0"}],
+            "explanation_contains": ["bistro.5x", "dining.3x", "base.1x"]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac3_priority_and_id_tie_break",
+      "acs": ["AC-3", "AC-13"],
+      "description": "Equal-specificity rules broken by priority desc then rule_id asc.",
+      "purchase": {
+        "amount_cents": 4000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 11,
+          "card_name": "Priority Card",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 9, "rule_key": "dining.low_prio", "version": 1, "scope_type": "category", "category": "dining", "priority": 1, "multiplier": "2.0", "effective_from": "2026-01-01"},
+            {"id": 5, "rule_key": "dining.high_prio_b", "version": 1, "scope_type": "category", "category": "dining", "priority": 10, "multiplier": "3.0", "effective_from": "2026-01-01"},
+            {"id": 4, "rule_key": "dining.high_prio_a", "version": 1, "scope_type": "category", "category": "dining", "priority": 10, "multiplier": "4.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 11,
+            "reward_units": "160",
+            "estimated_value_cents": 160,
+            "applied_portions": [{"portion_cents": 4000, "rule_id": 4, "rule_version": 1, "multiplier": "4.0"}]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac4_exclusion_falls_to_base",
+      "acs": ["AC-4"],
+      "description": "Grocery 4x excludes warehouse_club tag; base 1x applies and explanation states why.",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "groceries",
+        "merchant": "Bulk Mart",
+        "merchant_tags": ["warehouse_club"],
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 12,
+          "card_name": "Grocery Saver",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {
+              "id": 1,
+              "rule_key": "grocery.4x",
+              "version": 1,
+              "scope_type": "category",
+              "category": "groceries",
+              "multiplier": "4.0",
+              "effective_from": "2026-01-01",
+              "exclusions": [
+                {"exclusion_type": "merchant_tag", "target": "warehouse_club", "reason": "Warehouse clubs excluded"}
+              ]
+            },
+            {
+              "id": 2,
+              "rule_key": "base.1x",
+              "version": 1,
+              "scope_type": "base",
+              "multiplier": "1.0",
+              "effective_from": "2026-01-01"
+            }
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 12,
+            "reward_units": "100",
+            "estimated_value_cents": 100,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 2, "rule_version": 1, "multiplier": "1.0"}],
+            "explanation_contains": ["Warehouse clubs excluded", "grocery.4x"]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac5_cap_straddle_quarterly",
+      "acs": ["AC-5"],
+      "description": "5x rule with $500 quarterly cap and $450 prior spend straddles $100 purchase ($50 @ 5x, $50 @ 1x).",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 13,
+          "card_name": "Cap Straddle Card",
+          "reward_currency": "POINTS",
+          "rules": [
+            {
+              "id": 1,
+              "rule_key": "dining.5x_q",
+              "version": 1,
+              "scope_type": "category",
+              "category": "dining",
+              "multiplier": "5.0",
+              "cap_group_key": "dining_q",
+              "effective_from": "2026-01-01"
+            },
+            {
+              "id": 2,
+              "rule_key": "base.1x",
+              "version": 1,
+              "scope_type": "base",
+              "multiplier": "1.0",
+              "effective_from": "2026-01-01"
+            }
+          ],
+          "caps": [
+            {"cap_group_key": "dining_q", "cap_amount_cents": 50000, "period": "quarterly"}
+          ],
+          "spend_history": {"cap_spend_cents": {"dining_q": 45000}},
+          "valuation": {"reward_currency": "POINTS", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 13,
+            "reward_units": "300",
+            "estimated_value_cents": 300,
+            "applied_portions": [
+              {"portion_cents": 5000, "rule_id": 1, "rule_version": 1, "multiplier": "5.0"},
+              {"portion_cents": 5000, "rule_id": 2, "rule_version": 1, "multiplier": "1.0"}
+            ]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac5_cap_already_exhausted",
+      "acs": ["AC-5"],
+      "description": "Pre-exhausted cap falls back completely to base 1x.",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 14,
+          "card_name": "Exhausted Cap Card",
+          "reward_currency": "POINTS",
+          "rules": [
+            {"id": 1, "rule_key": "dining.5x_q", "version": 1, "scope_type": "category", "category": "dining", "multiplier": "5.0", "cap_group_key": "dining_q", "effective_from": "2026-01-01"},
+            {"id": 2, "rule_key": "base.1x", "version": 1, "scope_type": "base", "multiplier": "1.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [{"cap_group_key": "dining_q", "cap_amount_cents": 50000, "period": "quarterly"}],
+          "spend_history": {"cap_spend_cents": {"dining_q": 50000}},
+          "valuation": {"reward_currency": "POINTS", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 14,
+            "reward_units": "100",
+            "estimated_value_cents": 100,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 2, "rule_version": 1, "multiplier": "1.0"}],
+            "explanation_contains": ["exhausted"]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac6_effective_date_v1_boundary",
+      "acs": ["AC-6"],
+      "description": "Purchase on 2026-06-30 selects rule v1 (inclusive effective_to boundary).",
+      "purchase": {
+        "amount_cents": 5000,
+        "category": "dining",
+        "purchase_date": "2026-06-30"
+      },
+      "cards": [
+        {
+          "card_id": 15,
+          "card_name": "Versioned Card",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "dining.rate", "version": 1, "scope_type": "category", "category": "dining", "multiplier": "2.0", "effective_from": "2026-01-01", "effective_to": "2026-06-30"},
+            {"id": 2, "rule_key": "dining.rate", "version": 2, "scope_type": "category", "category": "dining", "multiplier": "4.0", "effective_from": "2026-07-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 15,
+            "reward_units": "100",
+            "estimated_value_cents": 100,
+            "applied_portions": [{"portion_cents": 5000, "rule_id": 1, "rule_version": 1, "multiplier": "2.0"}]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac6_effective_date_v2_boundary",
+      "acs": ["AC-6"],
+      "description": "Purchase on 2026-07-01 selects rule v2 (inclusive effective_from boundary).",
+      "purchase": {
+        "amount_cents": 5000,
+        "category": "dining",
+        "purchase_date": "2026-07-01"
+      },
+      "cards": [
+        {
+          "card_id": 15,
+          "card_name": "Versioned Card",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "dining.rate", "version": 1, "scope_type": "category", "category": "dining", "multiplier": "2.0", "effective_from": "2026-01-01", "effective_to": "2026-06-30"},
+            {"id": 2, "rule_key": "dining.rate", "version": 2, "scope_type": "category", "category": "dining", "multiplier": "4.0", "effective_from": "2026-07-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 15,
+            "reward_units": "200",
+            "estimated_value_cents": 200,
+            "applied_portions": [{"portion_cents": 5000, "rule_id": 2, "rule_version": 2, "multiplier": "4.0"}]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac6_no_effective_rule_ineligible",
+      "acs": ["AC-6"],
+      "description": "Purchase before any rule's effective_from produces INELIGIBLE no_effective_rule.",
+      "purchase": {
+        "amount_cents": 5000,
+        "category": "dining",
+        "purchase_date": "2025-12-31"
+      },
+      "cards": [
+        {
+          "card_id": 16,
+          "card_name": "Future Card",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "base.1x", "version": 1, "scope_type": "base", "multiplier": "1.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [],
+        "unranked": [],
+        "ineligible": [
+          {
+            "card_id": 16,
+            "rejection_reason": "no_effective_rule",
+            "explanation_contains": ["2025-12-31"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ac7_min_tx_threshold_fallback",
+      "acs": ["AC-7"],
+      "description": "$25 minimum transaction rule is rejected on $20 purchase; fallback 1x rule applies.",
+      "purchase": {
+        "amount_cents": 2000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 17,
+          "card_name": "Threshold Card",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "dining.min25", "version": 1, "scope_type": "category", "category": "dining", "min_transaction_cents": 2500, "multiplier": "5.0", "effective_from": "2026-01-01"},
+            {"id": 2, "rule_key": "base.1x", "version": 1, "scope_type": "base", "multiplier": "1.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 17,
+            "reward_units": "20",
+            "estimated_value_cents": 20,
+            "applied_portions": [{"portion_cents": 2000, "rule_id": 2, "rule_version": 1, "multiplier": "1.0"}],
+            "explanation_contains": ["$20.00", "$25.00", "dining.min25"]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "t15_period_spend_no_retroactivity",
+      "acs": ["T15"],
+      "description": "$900 prior + $200 purchase vs $1000 calendar_year threshold is rejected (no retroactivity).",
+      "purchase": {
+        "amount_cents": 20000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 18,
+          "card_name": "Tiered Card",
+          "reward_currency": "POINTS",
+          "rules": [
+            {
+              "id": 1,
+              "rule_key": "dining.tier2",
+              "version": 1,
+              "scope_type": "category",
+              "category": "dining",
+              "min_period_spend_cents": 100000,
+              "threshold_period": "calendar_year",
+              "multiplier": "4.0",
+              "effective_from": "2026-01-01"
+            },
+            {
+              "id": 2,
+              "rule_key": "base.1x",
+              "version": 1,
+              "scope_type": "base",
+              "multiplier": "1.0",
+              "effective_from": "2026-01-01"
+            }
+          ],
+          "caps": [],
+          "spend_history": {"threshold_spend_cents": {"calendar_year": 90000}},
+          "valuation": {"reward_currency": "POINTS", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 18,
+            "reward_units": "200",
+            "estimated_value_cents": 200,
+            "applied_portions": [{"portion_cents": 20000, "rule_id": 2, "rule_version": 1, "multiplier": "1.0"}],
+            "explanation_contains": ["$900.00", "$1000.00", "dining.tier2"]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac8_rule_version_isolation",
+      "acs": ["AC-8"],
+      "description": "Evaluating an identical purchase against rule v1 vs v2 yields isolated versioned results.",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 19,
+          "card_name": "Card v1 Snapshot",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "dining.promo", "version": 1, "scope_type": "category", "category": "dining", "multiplier": "2.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        },
+        {
+          "card_id": 20,
+          "card_name": "Card v2 New Calc",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 2, "rule_key": "dining.promo", "version": 2, "scope_type": "category", "category": "dining", "multiplier": "3.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 20,
+            "reward_units": "300",
+            "estimated_value_cents": 300,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 2, "rule_version": 2, "multiplier": "3.0"}]
+          },
+          {
+            "card_id": 19,
+            "reward_units": "200",
+            "estimated_value_cents": 200,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 1, "rule_version": 1, "multiplier": "2.0"}]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "ac9_valuation_reorders_cards",
+      "acs": ["AC-9"],
+      "description": "Higher user valuation reorders Miles ahead of Cash while reward_units stay unchanged.",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 21,
+          "card_name": "Cash 2.5x",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "cash.base", "version": 1, "scope_type": "base", "multiplier": "2.5", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        },
+        {
+          "card_id": 22,
+          "card_name": "Miles 2x",
+          "reward_currency": "SKY_MILES",
+          "rules": [
+            {"id": 2, "rule_key": "miles.base", "version": 1, "scope_type": "base", "multiplier": "2.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "SKY_MILES", "cents_per_unit": "2.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 22,
+            "reward_units": "200",
+            "estimated_value_cents": 400,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 2, "rule_version": 1, "multiplier": "2.0"}]
+          },
+          {
+            "card_id": 21,
+            "reward_units": "250",
+            "estimated_value_cents": 250,
+            "applied_portions": [{"portion_cents": 10000, "rule_id": 1, "rule_version": 1, "multiplier": "2.5"}]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "t16_rounding_modes_straddle",
+      "acs": ["T16"],
+      "description": "Straddled nearest_unit rounds once on summed portions (1.5 + 1.0 = 2.5 -> 3) and none_4dp preserves 4dp.",
+      "purchase": {
+        "amount_cents": 130,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 23,
+          "card_name": "Nearest Straddle",
+          "reward_currency": "POINTS",
+          "rules": [
+            {"id": 1, "rule_key": "dining.5x", "version": 1, "scope_type": "category", "category": "dining", "multiplier": "5.0", "cap_group_key": "cap_30", "rounding": "nearest_unit", "effective_from": "2026-01-01"},
+            {"id": 2, "rule_key": "base.1x", "version": 1, "scope_type": "base", "multiplier": "1.0", "rounding": "floor_units", "effective_from": "2026-01-01"}
+          ],
+          "caps": [{"cap_group_key": "cap_30", "cap_amount_cents": 30, "period": "monthly"}],
+          "spend_history": {},
+          "valuation": {"reward_currency": "POINTS", "cents_per_unit": "1.0", "is_user_set": true}
+        },
+        {
+          "card_id": 24,
+          "card_name": "Exact 4DP",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 3, "rule_key": "base.1_23x", "version": 1, "scope_type": "base", "multiplier": "1.23", "rounding": "none_4dp", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": false}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 23,
+            "reward_units": "3",
+            "estimated_value_cents": 3,
+            "applied_portions": [
+              {"portion_cents": 30, "rule_id": 1, "rule_version": 1, "multiplier": "5.0"},
+              {"portion_cents": 100, "rule_id": 2, "rule_version": 1, "multiplier": "1.0"}
+            ]
+          },
+          {
+            "card_id": 24,
+            "reward_units": "1.5990",
+            "estimated_value_cents": 2,
+            "warnings": ["illustrative default valuation"],
+            "applied_portions": [{"portion_cents": 130, "rule_id": 3, "rule_version": 1, "multiplier": "1.23"}]
+          }
+        ],
+        "unranked": [],
+        "ineligible": []
+      }
+    },
+    {
+      "id": "t18_cross_card_tie_and_ineligible",
+      "acs": ["AC-2", "AC-10", "AC-13"],
+      "description": "Two ranked cards tied at 300 cents broken by reward_units desc with tie note, plus one ineligible card.",
+      "purchase": {
+        "amount_cents": 10000,
+        "category": "dining",
+        "purchase_date": "2026-11-15"
+      },
+      "cards": [
+        {
+          "card_id": 25,
+          "card_name": "Apex Cash",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 1, "rule_key": "cash.3x", "version": 1, "scope_type": "base", "multiplier": "3.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        },
+        {
+          "card_id": 26,
+          "card_name": "Horizon Points",
+          "reward_currency": "HORIZON_PTS",
+          "rules": [
+            {"id": 2, "rule_key": "horizon.6x", "version": 1, "scope_type": "category", "category": "dining", "multiplier": "6.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "HORIZON_PTS", "cents_per_unit": "0.5", "is_user_set": true}
+        },
+        {
+          "card_id": 27,
+          "card_name": "Gas Only Card",
+          "reward_currency": "CASH_USD",
+          "rules": [
+            {"id": 3, "rule_key": "gas.5x", "version": 1, "scope_type": "category", "category": "gas", "multiplier": "5.0", "effective_from": "2026-01-01"}
+          ],
+          "caps": [],
+          "spend_history": {},
+          "valuation": {"reward_currency": "CASH_USD", "cents_per_unit": "1.0", "is_user_set": true}
+        }
+      ],
+      "expected": {
+        "ranked": [
+          {
+            "card_id": 26,
+            "reward_units": "600",
+            "estimated_value_cents": 300,
+            "explanation_contains": ["Tied on estimated value."]
+          },
+          {
+            "card_id": 25,
+            "reward_units": "300",
+            "estimated_value_cents": 300,
+            "explanation_contains": ["Tied on estimated value."]
+          }
+        ],
+        "unranked": [],
+        "ineligible": [
+          {
+            "card_id": 27,
+            "rejection_reason": "no_applicable_rule"
+          }
+        ],
+        "global_notes": [
+          "Annual fees and benefit credits are not included in this comparison."
+        ]
+      }
+    }
+  ]
+}

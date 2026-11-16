@@ -18,6 +18,7 @@ from app.engine.effective import (
     filter_effective_rules,
     is_rule_effective,
 )
+from app.engine.evaluate import evaluate_purchase
 from app.engine.explain import (
     render_explanation,
     render_trace_step,
@@ -105,6 +106,7 @@ __all__ = [
     "check_rule_applicability",
     "create_no_applicable_rule_evaluation",
     "create_no_effective_rule_evaluation",
+    "evaluate_purchase",
     "evaluate_valuation",
     "filter_applicable_rules",
     "filter_effective_rules",

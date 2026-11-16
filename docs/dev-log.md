@@ -600,3 +600,31 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Explanation renderer (trace → sentences) with golden-text tests implemented and verified against FR-15 and NFR-3. Satisfied.
+
+
+### Task T20: Engine Golden Fixtures (JSON) & ≥ 90% Branch Coverage in CI
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement the per-card `evaluate_purchase` orchestrator, create 16 JSON golden fixture scenarios covering all Phase 2 acceptance criteria, and enforce ≥ 90% branch coverage for `app.engine` in GitHub Actions CI.
+- **Implementation Details:**
+  - Created `backend/app/engine/evaluate.py`:
+    - `evaluate_purchase(purchase, card, spend_history, valuation) -> CardEvaluation`: Composes effective filtering, applicability filtering, rule selection, cap allocation, unit calculation/rounding, valuation/no-valuation routing, and explanation rendering in ARCHITECTURE §4.2 order with contiguous 1-based trace step numbers.
+    - Exported `evaluate_purchase` from `backend/app/engine/__init__.py`.
+  - Created `backend/tests/engine/fixtures/scenarios.json` (16 scenarios) and `backend/tests/engine/test_golden_fixtures.py` (18 tests) covering `AC-2`, `AC-3`, `AC-4`, `AC-5`, `AC-6`, `AC-7`, `AC-8` (rule-version isolation at the pure engine level; DB transaction snapshot persistence remains Phase 3 T31/T32), `AC-9`, `AC-10`, `AC-13`, `T15` non-retroactivity, `T16` rounding modes, `T18` tie-breaking/global notes, and all-caps-exhausted ineligibility.
+  - Added `pytest-cov>=5.0.0` to `backend/pyproject.toml` `[project.optional-dependencies].dev` and synced `backend/uv.lock`.
+  - Updated `.github/workflows/ci.yml` to run `pytest` with `--cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Approved implementing `evaluate_purchase` in `backend/app/engine/evaluate.py`, adding `pytest-cov`, and enforcing ≥ 90% engine branch coverage in CI.
+  - **AI Executed:** Implemented `evaluate_purchase`, authored 16 independent JSON golden fixtures, updated `pyproject.toml` / `uv.lock` / `ci.yml`, and verified coverage and static checks.
+- **Verification & Testing (Actual Results):**
+  - Baseline engine branch coverage (before T20): 97% (705 stmts, 14 miss, 246 branches, 18 partial).
+  - Final engine branch coverage (including `evaluate.py`, 100% covered): **96.78%** (741 stmts, 14 miss, 252 branches, 18 partial; ≥ 90% threshold satisfied).
+  - `uv run --directory backend --extra dev pytest tests/engine/test_golden_fixtures.py`: 18 passed in 0.15s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 227 passed in 2.00s.
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 12 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 25 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 47 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - ≥ 15 JSON golden fixture scenarios covering all Phase 2 ACs and ≥ 90% engine branch coverage enforced in CI. Satisfied.
