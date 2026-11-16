@@ -212,3 +212,40 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
 ## Phase 1 Review & Gate G1 Status
 - **Phase 1 Summary:** All foundation tasks (T01 repository foundation, T02 backend skeleton, T03 frontend skeleton, T04 Docker Compose stack, T05 SQLAlchemy + Alembic, T06 GitHub Actions CI, T07 role files) are complete, verified locally and in CI.
 - **Gate G1:** Ready for human review of skeleton + CI before domain work begins in Phase 2 (Reward engine).
+
+
+## Phase 2 — Reward Engine
+
+### Gate G1 Review & Acceptance
+- **Date:** 2026-11-15
+- **Status:** Gate G1 formally accepted by human review. Verified that T01-T07 are committed to `main` (commit `b42760d`), working tree clean, synchronized with `origin/main`, and GitHub Actions CI run `43800783707` passed green on both backend and frontend.
+
+### Task T08: Engine Types
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** Define pure, immutable domain types and enums for the reward calculation engine (`Purchase`, `Rule`/`EarningRule`, `Cap`/`SpendCap`, `SpendHistory`, `Valuation`, `CardEvaluation`, `TraceStep`, `AppliedPortion`, `CardContext`, `RuleExclusion`) using frozen dataclasses and StrEnum. Ensure `mypy --strict` passes and enforce no `float` in `app.engine`.
+- **Implementation Details:**
+  - Created `backend/app/engine/types.py`:
+    - Defined StrEnums: `ScopeType`, `Period`, `RoundingMode`, `PostCapBehavior`, `ExclusionType`, `CardStatus`, `UnrankedReason`, `IneligibleReason`.
+    - Defined frozen dataclasses with `slots=True`: `Purchase`, `SpendCap` (alias `Cap`), `EarningRule` (alias `Rule`), `RuleExclusion`, `SpendHistory`, `Valuation`, `CardContext`, `AppliedPortion`, `TraceStep`, `CardEvaluation`.
+    - Enforced boundary validations in `__post_init__` (strictly positive monetary cents, non-negative multipliers, date order, and status consistency checks).
+    - Enforced deep immutability and sequence determinism: defensively copied mappings in `SpendHistory` and wrapped them in `MappingProxyType`, and normalized all sequence inputs (`merchant_tags`, `exclusions`, `rules`, `caps`, `applied_portions`, `trace`, `explanation`, `warnings`) via `_normalize_sequence` to immutable `tuple`s, strictly rejecting unordered sets and frozensets with a `TypeError`.
+    - Enforced runtime type safety and Decimal finiteness: rejected `float` and `bool` for monetary integer cents, enforced `Decimal` instances, and rejected non-finite Decimals (`NaN`, `sNaN`, `Infinity`, `-Infinity`) via `value.is_finite()`.
+    - Excluded all binary float types and floating-point literals, adhering to NFR-1.
+  - Updated `backend/app/engine/__init__.py` exporting all domain types and aliases.
+  - Implemented unit tests in `backend/tests/engine/test_types.py` covering construction, deep immutability, mapping protection, sequence determinism, Decimal finiteness, runtime numeric validation, boundary conditions, and aliases.
+  - Implemented automated AST check in `backend/tests/engine/test_no_float.py` inspecting all Python files in `app/engine/` to verify zero float literals, float annotations, or float references, with meta-tests.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Accepted Gate G1 checkpoint, conducted independent reviews of T08, and approved targeted hardening for deep immutability, sequence determinism, and Decimal finiteness.
+  - **AI Executed:** Followed test-first TDD, implemented domain types, hardened deep immutability and finiteness validation, added comprehensive unit and AST tests, and verified static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine`: 27 passed in 0.17s.
+  - `uv run --directory backend --extra dev pytest`: 33 passed in 0.56s (full backend suite).
+  - `uv run --directory backend --extra dev mypy app/engine`: Success: no issues found in 2 source files (`mypy --strict`).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 15 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 27 files already formatted.
+  - `npm test --prefix frontend -- --run`: 9 passed in 3.37s.
+- **Acceptance Criteria [Done when]:**
+  - `mypy strict passes`: Verified (`app/engine` passed in strict mode with 0 errors).
+  - `no float in package (test greps/AST)`: Verified by `tests/engine/test_no_float.py` passing with 0 violations.
