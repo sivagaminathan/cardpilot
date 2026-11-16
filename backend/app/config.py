@@ -94,6 +94,10 @@ class Settings(BaseSettings):
         default=False, alias="DEV_FAULT_INJECT_RECOMMENDATIONS"
     )
 
+    # On-call webhook relay (non-production only)
+    grafana_webhook_secret: str | None = Field(default=None, alias="GRAFANA_WEBHOOK_SECRET")
+    github_dispatch_token: str | None = Field(default=None, alias="GITHUB_DISPATCH_TOKEN")
+
     @property
     def is_dev_fault_injection_active(self) -> bool:
         """Return True only when fault injection is enabled outside production."""

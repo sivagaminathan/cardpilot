@@ -23,10 +23,12 @@ Save changes and redeploy `cardpilot-api-dev`. Traces, metrics, and correlated l
 ## 3. Configure Grafana Alert & AI On-Call Agent
 
 1. Import the alert rule definition from `observability/grafana/provisioning/alerting/alerts.yml` in Grafana Cloud **Alerting → Alert rules**.
-2. Create a **Webhook** contact point pointing to GitHub's `repository_dispatch` API:
-   - URL: `https://api.github.com/repos/sivagaminathan/cardpilot/dispatches`
-   - Authorization: Bearer `<fine-grained GitHub PAT with Actions/Contents write on this repo>`
-   - Payload: `{"event_type":"grafana-alert","client_payload":{"alert_name":"CardPilot API High 5xx Error Rate","service":"cardpilot-api","environment":"development","severity":"critical"}}`
+2. Create a **Webhook** contact point pointing to CardPilot's Grafana webhook relay endpoint, which validates the bearer secret and forwards firing alerts to GitHub's `repository_dispatch` (`grafana-alert`) workflow:
+   - **Grafana Cloud URL:** `https://cardpilot-api-dev.onrender.com/api/v1/webhooks/grafana-alert`
+   - **Local Docker Compose URL:** `http://api:8000/api/v1/webhooks/grafana-alert`
+   - **HTTP Method:** `POST`
+   - **Authentication:** `Authorization: Bearer <GRAFANA_WEBHOOK_SECRET>` (must match `GRAFANA_WEBHOOK_SECRET` configured on Render `cardpilot-api-dev` / local `.env`)
+   - **Render / Local API Env Vars:** set `GRAFANA_WEBHOOK_SECRET` and `GITHUB_DISPATCH_TOKEN` (fine-grained GitHub PAT with `Actions: write` / `Contents: write` on this repo; never commit real secrets)
 3. In GitHub **Settings → Secrets and variables → Actions**, optionally add:
    - `OPENAI_API_KEY` (for LLM-powered root cause narrative)
    - `GRAFANA_LOKI_URL`, `GRAFANA_TEMPO_URL`, `GRAFANA_AUTH_HEADER` (for live Grafana Cloud telemetry queries from `.github/scripts/oncall_agent.py`)
