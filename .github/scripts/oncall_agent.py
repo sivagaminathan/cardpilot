@@ -24,6 +24,55 @@ def _http_get_json(url: str, headers: dict[str, str] | None = None) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
+_TRACE_ID_RE = re.compile(r"^[0-9a-fA-F]{16,32}$")
+
+
+def _is_valid_trace_id(value: str | None) -> bool:
+    return bool(value and _TRACE_ID_RE.fullmatch(value.strip()))
+
+
+def _parse_log_entry(ts: str, line: str, labels: dict[str, Any]) -> dict[str, Any]:
+    """Parse a Loki log line, preferring structured JSON fields over stream labels."""
+    parsed: dict[str, Any] = {}
+    try:
+        loaded = json.loads(line)
+        if isinstance(loaded, dict):
+            parsed = loaded
+    except json.JSONDecodeError:
+        parsed = {}
+
+    return {
+        "timestamp": ts,
+        "level": parsed.get("level") or labels.get("level"),
+        "message": parsed.get("message") or labels.get("message"),
+        "status_code": parsed.get("status_code") or labels.get("status_code"),
+        "path": parsed.get("path") or labels.get("path"),
+        "trace_id": parsed.get("trace_id") or labels.get("trace_id"),
+        "span_id": parsed.get("span_id") or labels.get("span_id"),
+        "line": line,
+    }
+
+
+def _query_loki_range(
+    loki_url: str,
+    auth_header: str | None,
+    query: str,
+) -> list[dict[str, Any]]:
+    base = loki_url.rstrip("/")
+    params = urllib.parse.urlencode({"query": query, "limit": "20"})
+    headers = {"Accept": "application/json"}
+    if auth_header:
+        headers["Authorization"] = auth_header
+    data = _http_get_json(f"{base}/loki/api/v1/query_range?{params}", headers=headers)
+    results = data.get("data", {}).get("result", [])
+    evidence: list[dict[str, Any]] = []
+    for stream in results:
+        labels = stream.get("stream", {})
+        for ts, line in stream.get("values", [])[:10]:
+            evidence.append(_parse_log_entry(ts, line, labels))
+    return evidence
+
+
 def _fetch_loki_evidence(
     loki_url: str,
     auth_header: str | None,
@@ -31,33 +80,42 @@ def _fetch_loki_evidence(
 ) -> list[dict[str, Any]]:
     if not loki_url:
         return []
-    base = loki_url.rstrip("/")
-    query = '{service_name="cardpilot-api"}'
-    if trace_id and re.fullmatch(r"[0-9a-fA-F]{16,32}", trace_id):
-        query = f'{{service_name="cardpilot-api"}} |= "{trace_id}"'
-    params = urllib.parse.urlencode({"query": query, "limit": "20"})
-    headers = {"Accept": "application/json"}
-    if auth_header:
-        headers["Authorization"] = auth_header
+    if _is_valid_trace_id(trace_id):
+        query = f'{{service_name="cardpilot-api"}} |= "{trace_id.strip()}"'
+    else:
+        query = (
+            '{service_name="cardpilot-api"} '
+            '|~ "fault_injected|ERROR|\\"status_code\\":\\\\s*5[0-9]{2}"'
+        )
     try:
-        data = _http_get_json(f"{base}/loki/api/v1/query_range?{params}", headers=headers)
-        results = data.get("data", {}).get("result", [])
-        evidence: list[dict[str, Any]] = []
-        for stream in results:
-            labels = stream.get("stream", {})
-            for ts, line in stream.get("values", [])[:5]:
-                evidence.append(
-                    {
-                        "timestamp": ts,
-                        "line": line,
-                        "status_code": labels.get("status_code"),
-                        "path": labels.get("path"),
-                        "trace_id": labels.get("trace_id"),
-                    }
-                )
+        evidence = _query_loki_range(loki_url, auth_header, query)
+        if not evidence and not _is_valid_trace_id(trace_id):
+            evidence = _query_loki_range(loki_url, auth_header, '{service_name="cardpilot-api"}')
         return evidence
     except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
         return [{"error": f"Failed to query Loki: {type(exc).__name__}"}]
+
+
+def _extract_trace_id(loki_evidence: list[dict[str, Any]]) -> str:
+    """Extract the most relevant valid trace_id from Loki log entries."""
+    fallback = ""
+    for item in loki_evidence:
+        tid = str(item.get("trace_id") or "").strip()
+        if not _is_valid_trace_id(tid):
+            continue
+        status_code = item.get("status_code")
+        is_error = (
+            item.get("level") == "ERROR"
+            or "fault_injected" in str(item.get("message") or "")
+            or "fault_injected" in str(item.get("line") or "")
+            or (isinstance(status_code, int) and status_code >= 500)
+            or (isinstance(status_code, str) and status_code.isdigit() and int(status_code) >= 500)
+        )
+        if is_error:
+            return tid
+        if not fallback:
+            fallback = tid
+    return fallback
 
 
 def _fetch_tempo_trace(
@@ -65,14 +123,14 @@ def _fetch_tempo_trace(
     auth_header: str | None,
     trace_id: str,
 ) -> dict[str, Any]:
-    if not tempo_url or not trace_id or not re.fullmatch(r"[0-9a-fA-F]{16,32}", trace_id):
+    if not tempo_url or not _is_valid_trace_id(trace_id):
         return {}
     base = tempo_url.rstrip("/")
     headers = {"Accept": "application/json"}
     if auth_header:
         headers["Authorization"] = auth_header
     try:
-        return dict(_http_get_json(f"{base}/api/traces/{trace_id}", headers=headers))
+        return dict(_http_get_json(f"{base}/api/traces/{trace_id.strip()}", headers=headers))
     except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
         return {"error": f"Failed to query Tempo: {type(exc).__name__}"}
 
@@ -144,25 +202,30 @@ def main() -> int:
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
     loki_evidence = _fetch_loki_evidence(loki_url, grafana_auth, trace_id)
-    tempo_trace = _fetch_tempo_trace(tempo_url, grafana_auth, trace_id)
-
-    rec_service_snippet = (
-        (REPO_ROOT / "backend" / "app" / "services" / "recommendations.py")
-        .read_text(encoding="utf-8")[:3500]
+    effective_trace_id = (
+        trace_id if _is_valid_trace_id(trace_id) else _extract_trace_id(loki_evidence)
     )
+    tempo_trace = _fetch_tempo_trace(tempo_url, grafana_auth, effective_trace_id)
+    tempo_present = bool(tempo_trace and "error" not in tempo_trace)
+
+    rec_service_source = (
+        REPO_ROOT / "backend" / "app" / "services" / "recommendations.py"
+    ).read_text(encoding="utf-8")
 
     prompt = (
         f"Alert: {alert_name}\nService: {service}\nEnvironment: {environment}\n"
-        f"Severity: {severity}\nSummary: {summary}\nTrace ID: {trace_id or 'N/A'}\n\n"
+        f"Severity: {severity}\nSummary: {summary}\n"
+        f"Trace ID: {effective_trace_id or 'N/A'}\n\n"
         f"Loki Evidence:\n{json.dumps(loki_evidence, indent=2)}\n\n"
-        f"Tempo Trace Present: {bool(tempo_trace and 'error' not in tempo_trace)}\n\n"
-        f"Relevant Code (recommendations.py):\n{rec_service_snippet}\n"
+        f"Tempo Trace Present: {tempo_present}\n\n"
+        f"Relevant Code (recommendations.py):\n{rec_service_source}\n"
     )
     llm_report = _call_openai_analysis(prompt, openai_key)
 
-    has_fault_log = any(
-        "fault_injected" in json.dumps(item) for item in loki_evidence
-    ) or "DEV_FAULT_INJECT_RECOMMENDATIONS" in summary
+    has_fault_log = (
+        any("fault_injected" in json.dumps(item) for item in loki_evidence)
+        or "DEV_FAULT_INJECT_RECOMMENDATIONS" in summary
+    )
 
     deterministic_rca = (
         "Telemetry and code inspection indicate the HTTP 500s on "
@@ -170,8 +233,8 @@ def main() -> int:
         "controlled development fault-injection flag (`DEV_FAULT_INJECT_RECOMMENDATIONS=true` "
         "in `backend/app/config.py` / `backend/app/services/recommendations.py`). "
         "This is an intentional non-production fault-injection setting, not a code defect. "
-        "Remediation: set `DEV_FAULT_INJECT_RECOMMENDATIONS=false` in the Render `cardpilot-api-dev` "
-        "environment and re-verify `/api/v1/profiles/maya/recommendations`."
+        "Remediation: set `DEV_FAULT_INJECT_RECOMMENDATIONS=false` in the Render "
+        "`cardpilot-api-dev` environment and re-verify `/api/v1/profiles/maya/recommendations`."
         if has_fault_log
         else "Investigated `POST /api/v1/profiles/{profile_key}/recommendations` and telemetry. "
         "Review attached Loki/Tempo evidence to confirm whether `DEV_FAULT_INJECT_RECOMMENDATIONS` "
@@ -189,7 +252,8 @@ def main() -> int:
         f"- **Environment:** `{environment}`\n"
         f"- **Severity:** `{severity}`\n"
         f"- **Summary:** {summary}\n"
-        f"- **Trace ID:** `{trace_id or 'not provided'}`\n\n"
+        f"- **Trace ID:** `{effective_trace_id or 'not provided'}`\n"
+        f"- **Tempo Trace Correlated:** `{tempo_present}`\n\n"
         f"## Root Cause Analysis\n\n"
         f"{llm_report or deterministic_rca}\n\n"
         f"## Telemetry Evidence (Loki)\n\n"
