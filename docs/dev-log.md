@@ -487,3 +487,33 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Non-retroactive period-spend threshold implemented and verified in applicability and cap-allocation pipelines. Satisfied.
+
+
+### Task T16: Units + Rounding Modes (Floor / Nearest / None) with Decimal
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement pure Decimal reward-unit calculation and transaction-level rounding once on the summed portions per BACKLOG T16 and ARCHITECTURE §4.2 step 5 & §4.6.
+- **Implementation Details:**
+  - Created `backend/app/engine/units.py`:
+    - `UnitsResult`: Frozen, slotted dataclass holding `applied_portions`, `unrounded_total_units`, `total_reward_units`, `rounding_mode_used`, and `trace_step`, with `_validate_decimal` and `_normalize_sequence` runtime checks.
+    - `calculate_reward_units(portions)`: Converts each `CapPortion` into an `AppliedPortion` with unrounded `reward_units = (Decimal(amount_cents) / Decimal("100")) * rule.multiplier`, sums all unrounded units, and applies the first portion's `rule.rounding` once at the transaction level:
+      - `FLOOR_UNITS`: `ROUND_FLOOR` to integer `Decimal("1")`
+      - `NEAREST_UNIT`: `ROUND_HALF_UP` to integer `Decimal("1")`
+      - `NONE_4DP`: `ROUND_HALF_UP` to `Decimal("0.0001")`
+    - Rejects empty `portions`, unordered sets, and unsupported rounding modes with explicit errors.
+    - Emits a deterministic `TraceStep(step_type="units_calculation", action="calculated", ...)` recording unrounded sum, rounding mode, and final total.
+  - Exported `UnitsResult` and `calculate_reward_units` from `backend/app/engine/__init__.py`.
+  - Added 27 table-driven and unit tests in `backend/tests/engine/test_units.py` covering all three rounding modes, exact integer and fractional values, half cases (2.5, 3.5, 0.00005, 0.00015), multi-portion summing before rounding, straddled purchases with differing rule rounding modes, empty/invalid inputs, float/bool rejection, determinism, and immutability.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Specified `ROUND_HALF_UP` for `NEAREST_UNIT` and `NONE_4DP`, `Decimal("0.0001")` quantization for `NONE_4DP`, using the first portion's rounding mode with no override parameter, and rejecting empty portions.
+  - **AI Executed:** Followed test-first TDD, implemented pure Decimal unit calculation/rounding, verified all tests and static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_units.py tests/engine/test_no_float.py`: 29 passed in 0.16s.
+  - `uv run --directory backend --extra dev pytest`: 176 passed in 0.78s.
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 8 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 21 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 39 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Units calculation and rounding modes (`floor_units`, `nearest_unit`, `none_4dp`) with Decimal implemented and verified with table-driven tests including half cases. Satisfied.

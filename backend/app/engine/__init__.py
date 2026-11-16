@@ -50,6 +50,10 @@ from app.engine.types import (
     UnrankedReason,
     Valuation,
 )
+from app.engine.units import (
+    UnitsResult,
+    calculate_reward_units,
+)
 
 __all__ = [
     "ApplicabilityResult",
@@ -75,9 +79,11 @@ __all__ = [
     "SpendCap",
     "SpendHistory",
     "TraceStep",
+    "UnitsResult",
     "UnrankedReason",
     "Valuation",
     "allocate_purchase_across_caps",
+    "calculate_reward_units",
     "check_rule_applicability",
     "create_no_applicable_rule_evaluation",
     "create_no_effective_rule_evaluation",
