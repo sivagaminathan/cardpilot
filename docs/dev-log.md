@@ -159,3 +159,29 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `npm run lint` (in `frontend/`): Passed (0 errors, 0 warnings).
 - **Acceptance Criteria [Done when]:**
   - `alembic upgrade head` on empty DB works; readiness test passes against real Postgres. Satisfied.
+
+### Task T06: CI v1 — GitHub Actions Workflow
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** GitHub Actions CI configuration (.github/workflows/ci.yml) validating backend (Postgres service, Ruff lint/format, mypy, Alembic migrations, Pytest) and frontend (ESLint, TypeScript/Vite build, Vitest) on push/PR to main.
+- **Implementation Details:**
+  - `.github/workflows/ci.yml`: Authored dual-job CI pipeline running on `ubuntu-latest`:
+    - `backend` job: Spawns PostgreSQL 16 Alpine service container with health check (`pg_isready`), sets up Python 3.11 with pip caching on `backend/pyproject.toml`, installs package with dev dependencies (`pip install -e "./backend[dev]"`), runs `ruff format --check backend`, `ruff check backend`, `mypy backend`, `alembic upgrade head`, and `pytest backend`.
+    - `frontend` job: Sets up Node.js 22 with npm caching on `frontend/package-lock.json`, runs `npm ci`, `npm run lint` (ESLint), `npm run build` (`tsc && vite build`), and `npm test` (Vitest).
+    - Configured workflow triggers on `push` and `pull_request` targeting `main`, with concurrency group cancellation for obsolete in-progress runs.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Directed implementation of T06 without unnecessary third-party actions, secrets, or extra infrastructure.
+  - **AI Executed:** Authored workflow file, validated YAML syntax, executed equivalent verification checks locally.
+- **Verification & Testing (Actual Results):**
+  - Workflow YAML validation: Parsed `.github/workflows/ci.yml` via Python `yaml.safe_load` (Valid syntax).
+  - Backend local verification:
+    - `python -m ruff format --check backend`: 24 files formatted.
+    - `python -m ruff check backend`: All checks passed (0 errors).
+    - `python -m mypy backend`: Success (0 errors in 23 source files).
+    - `python -m pytest backend`: 6 passed in 0.33s.
+  - Frontend local verification:
+    - `npm run lint`: Passed (0 errors, 0 warnings).
+    - `npm run build`: Production bundle built cleanly in 978ms.
+    - `npm test`: 9 passed in 4.40s.
+- **Acceptance Criteria [Done when]:**
+  - Both jobs green on a PR. Workflow configured and verified locally; live GitHub Actions execution will trigger upon push/PR.
