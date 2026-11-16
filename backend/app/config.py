@@ -103,13 +103,6 @@ class Settings(BaseSettings):
         )
 
     @property
-    def is_dev_fault_injection_active(self) -> bool:
-        """Return True only when fault injection is enabled outside production."""
-        return (
-            self.dev_fault_inject_recommendations and self.environment.strip().lower() != "production"
-        )
-
-    @property
     def cors_origin_list(self) -> list[str]:
         """Return CORS origins parsed as a list of strings."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
