@@ -1,0 +1,51 @@
+# Fictional card products for CardPilot demo (T24).
+# Covers cash-back, flexible-points, airline-miles, flat-rate, and category-specialist styles.
+card_products:
+  - issuer_name: Northwind Bank
+    name: Northwind Cash Everyday
+    reward_currency_code: NW_CASH
+    annual_fee_cents: 0
+    network_label: Vexa
+    style: cash_back
+    description: Fictional no-fee cash-back card with dining and gas bonuses.
+    is_fictional: true
+  - issuer_name: Northwind Bank
+    name: Northwind Dining & Travel
+    reward_currency_code: NWT_PTS
+    annual_fee_cents: 9500
+    network_label: Vexa
+    style: flexible_points
+    description: Fictional flexible points card for dining, travel, and partner cafes.
+    is_fictional: true
+  - issuer_name: Skyward Financial
+    name: Skyward Miles Explorer
+    reward_currency_code: SKY_MILES
+    annual_fee_cents: 9500
+    network_label: Aether
+    style: airline_miles
+    description: Fictional airline miles card with travel bonuses and baggage credit.
+    is_fictional: true
+  - issuer_name: Meridian Trust
+    name: Meridian Flat 2%
+    reward_currency_code: NW_CASH
+    annual_fee_cents: 0
+    network_label: Vexa
+    style: flat_rate
+    description: Fictional flat-rate 2% cash-back card on all eligible purchases.
+    is_fictional: true
+  - issuer_name: Verdant Credit Union
+    name: Verdant Grocery Specialist
+    reward_currency_code: NW_CASH
+    annual_fee_cents: 0
+    network_label: Nova
+    style: category_specialist
+    description: Fictional grocery-specialist card with quarterly cap and club exclusions.
+    is_fictional: true
+  - issuer_name: Horizon Bancorp
+    name: Horizon Summit Points
+    reward_currency_code: HORIZON_PTS
+    annual_fee_cents: 19500
+    network_label: Aether
+    style: flexible_points
+    description: Fictional premium points card with spend-threshold bonus and travel perks.
+    is_fictional: true

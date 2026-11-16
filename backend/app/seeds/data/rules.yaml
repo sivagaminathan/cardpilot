@@ -1,0 +1,310 @@
+# Fictional spend caps, earning rules, and exclusions for CardPilot demo (T24).
+# All rules are fictional sample data with explicit source, effective dates, and review dates.
+spend_caps:
+  - cap_group_key: verdant.groceries.qtr
+    card_product:
+      issuer_name: Verdant Credit Union
+      name: Verdant Grocery Specialist
+    cap_amount_cents: 50000
+    period: quarterly
+  - cap_group_key: nwcash.gas.month
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Cash Everyday
+    cap_amount_cents: 30000
+    period: monthly
+
+earning_rules:
+  # Northwind Cash Everyday — base + superseded dining v1/v2 + capped gas
+  - rule_key: nwcash.base
+    version: 1
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Cash Everyday
+    reward_currency_code: NW_CASH
+    scope_type: base
+    multiplier: "1.0000"
+    priority: 0
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-15"
+    is_fictional: true
+
+  - rule_key: nwcash.dining
+    version: 1
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Cash Everyday
+    reward_currency_code: NW_CASH
+    scope_type: category
+    category_code: dining
+    multiplier: "3.0000"
+    priority: 10
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: "2026-06-30"
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-15"
+    is_fictional: true
+
+  - rule_key: nwcash.dining
+    version: 2
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Cash Everyday
+    reward_currency_code: NW_CASH
+    scope_type: category
+    category_code: dining
+    multiplier: "3.5000"
+    priority: 10
+    rounding: floor_units
+    effective_from: "2026-07-01"
+    effective_to: null
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-07-01"
+    supersedes:
+      rule_key: nwcash.dining
+      version: 1
+    is_fictional: true
+
+  - rule_key: nwcash.gas
+    version: 1
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Cash Everyday
+    reward_currency_code: NW_CASH
+    scope_type: category
+    category_code: gas
+    multiplier: "2.0000"
+    priority: 10
+    cap_group_key: nwcash.gas.month
+    post_cap_behavior: fallback_to_base
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-15"
+    is_fictional: true
+
+  # Northwind Dining & Travel — base + dining + min_tx threshold travel + merchant cafe
+  - rule_key: nwtpts.base
+    version: 1
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Dining & Travel
+    reward_currency_code: NWT_PTS
+    scope_type: base
+    multiplier: "1.0000"
+    priority: 0
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-15"
+    is_fictional: true
+
+  - rule_key: nwtpts.dining
+    version: 1
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Dining & Travel
+    reward_currency_code: NWT_PTS
+    scope_type: category
+    category_code: dining
+    multiplier: "3.0000"
+    priority: 10
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-15"
+    is_fictional: true
+
+  - rule_key: nwtpts.travel_min25
+    version: 1
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Dining & Travel
+    reward_currency_code: NWT_PTS
+    scope_type: category
+    category_code: travel
+    multiplier: "3.0000"
+    priority: 10
+    min_transaction_cents: 2500
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-15"
+    is_fictional: true
+
+  - rule_key: nwtpts.harbor_roasters
+    version: 1
+    card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Dining & Travel
+    reward_currency_code: NWT_PTS
+    scope_type: merchant
+    merchant_name: Harbor Roasters
+    multiplier: "5.0000"
+    priority: 20
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-15"
+    is_fictional: true
+
+  # Skyward Miles Explorer — base + travel
+  - rule_key: skymiles.base
+    version: 1
+    card_product:
+      issuer_name: Skyward Financial
+      name: Skyward Miles Explorer
+    reward_currency_code: SKY_MILES
+    scope_type: base
+    multiplier: "1.0000"
+    priority: 0
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Skyward Financial Sample Catalog (Fictional)
+    last_reviewed_on: "2026-02-01"
+    is_fictional: true
+
+  - rule_key: skymiles.travel
+    version: 1
+    card_product:
+      issuer_name: Skyward Financial
+      name: Skyward Miles Explorer
+    reward_currency_code: SKY_MILES
+    scope_type: category
+    category_code: travel
+    multiplier: "4.0000"
+    priority: 10
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Skyward Financial Sample Catalog (Fictional)
+    last_reviewed_on: "2026-02-01"
+    is_fictional: true
+
+  # Meridian Flat 2% — flat-rate base
+  - rule_key: meridian.base
+    version: 1
+    card_product:
+      issuer_name: Meridian Trust
+      name: Meridian Flat 2%
+    reward_currency_code: NW_CASH
+    scope_type: base
+    multiplier: "2.0000"
+    priority: 0
+    rounding: nearest_unit
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Meridian Trust Sample Catalog (Fictional)
+    last_reviewed_on: "2026-01-20"
+    is_fictional: true
+
+  # Verdant Grocery Specialist — base + capped 5x groceries with warehouse_club exclusion
+  - rule_key: verdant.base
+    version: 1
+    card_product:
+      issuer_name: Verdant Credit Union
+      name: Verdant Grocery Specialist
+    reward_currency_code: NW_CASH
+    scope_type: base
+    multiplier: "1.0000"
+    priority: 0
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Verdant Credit Union Sample Catalog (Fictional)
+    last_reviewed_on: "2026-03-01"
+    is_fictional: true
+
+  - rule_key: verdant.groceries
+    version: 1
+    card_product:
+      issuer_name: Verdant Credit Union
+      name: Verdant Grocery Specialist
+    reward_currency_code: NW_CASH
+    scope_type: category
+    category_code: groceries
+    multiplier: "5.0000"
+    priority: 10
+    cap_group_key: verdant.groceries.qtr
+    post_cap_behavior: fallback_to_base
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Verdant Credit Union Sample Catalog (Fictional)
+    last_reviewed_on: "2026-03-01"
+    is_fictional: true
+
+  # Horizon Summit Points — base + period-spend threshold dining + streaming
+  - rule_key: horizon.base
+    version: 1
+    card_product:
+      issuer_name: Horizon Bancorp
+      name: Horizon Summit Points
+    reward_currency_code: HORIZON_PTS
+    scope_type: base
+    multiplier: "1.5000"
+    priority: 0
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Horizon Bancorp Sample Catalog (Fictional)
+    last_reviewed_on: "2026-02-15"
+    is_fictional: true
+
+  - rule_key: horizon.dining_tier
+    version: 1
+    card_product:
+      issuer_name: Horizon Bancorp
+      name: Horizon Summit Points
+    reward_currency_code: HORIZON_PTS
+    scope_type: category
+    category_code: dining
+    multiplier: "4.0000"
+    priority: 10
+    min_period_spend_cents: 100000
+    threshold_period: quarterly
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Horizon Bancorp Sample Catalog (Fictional)
+    last_reviewed_on: "2026-02-15"
+    is_fictional: true
+
+  - rule_key: horizon.streaming
+    version: 1
+    card_product:
+      issuer_name: Horizon Bancorp
+      name: Horizon Summit Points
+    reward_currency_code: HORIZON_PTS
+    scope_type: category
+    category_code: streaming
+    multiplier: "3.0000"
+    priority: 10
+    rounding: floor_units
+    effective_from: "2026-01-01"
+    effective_to: null
+    source_title: Horizon Bancorp Sample Catalog (Fictional)
+    last_reviewed_on: "2026-02-15"
+    is_fictional: true
+
+rule_exclusions:
+  - rule_key: verdant.groceries
+    rule_version: 1
+    exclusion_type: merchant_tag
+    target_tag: warehouse_club
+    reason: Warehouse club purchases are excluded from the 5x grocery bonus.
+  - rule_key: verdant.groceries
+    rule_version: 1
+    exclusion_type: merchant_tag
+    target_tag: big_box
+    reason: Big-box superstore purchases are excluded from the 5x grocery bonus.

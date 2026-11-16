@@ -1,0 +1,18 @@
+# Spending categories for CardPilot demo (T24).
+categories:
+  - code: dining
+    name: Dining
+  - code: groceries
+    name: Groceries
+  - code: gas
+    name: Gas
+  - code: travel
+    name: Travel
+  - code: streaming
+    name: Streaming
+  - code: online_retail
+    name: Online Retail
+  - code: utilities
+    name: Utilities
+  - code: other
+    name: Other

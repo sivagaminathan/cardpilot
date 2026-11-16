@@ -697,3 +697,25 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Profiles, cards, valuations, transactions, calculation snapshots, rule references, benefits, usages, DB/ORM immutability guard, and reversible Alembic migration implemented and verified against real PostgreSQL. Satisfied.
+
+## T24 — Fictional seed data files (2026-11-16)
+- **What was done:**
+  - Added `pyyaml>=6.0` (runtime) and `types-PyYAML>=6.0` (dev) to `backend/pyproject.toml` and updated `backend/uv.lock`.
+  - Created 7 fictional YAML seed data files under `backend/app/seeds/data/`:
+    - `currencies.yaml`: 4 fictional reward currencies (`NW_CASH`, `NWT_PTS`, `SKY_MILES`, `HORIZON_PTS`) covering `cash_back`, `points`, and `miles` with decimal-string `default_cents_per_unit`.
+    - `categories.yaml`: 8 standard categories (`dining`, `groceries`, `gas`, `travel`, `streaming`, `online_retail`, `utilities`, `other`).
+    - `merchants.yaml`: 8 fictional merchants with `default_category_code` and tags including `warehouse_club` (`BulkDepot Club`) and `big_box`.
+    - `sources.yaml`: 5 `fictional_sample` sources with `last_reviewed_on` and explicit fictional disclaimers.
+    - `card_products.yaml`: 6 fictional card products across 4 fictional issuers covering `cash_back`, `flexible_points`, `airline_miles`, `flat_rate`, and `category_specialist`.
+    - `rules.yaml`: 2 `spend_caps`, 16 `earning_rules` (base fallbacks for all 6 products, superseded `nwcash.dining` v1→v2 with non-overlapping dates, capped `verdant.groceries` and `nwcash.gas`, per-tx threshold `nwtpts.travel_min25`, period-spend threshold `horizon.dining_tier`, merchant-specific `nwtpts.harbor_roasters`), and 2 `rule_exclusions` (`warehouse_club` and `big_box`).
+    - `benefits.yaml`: 5 fictional `benefit_definitions` covering `credit`, `allowance`, and `perk` across `monthly`, `quarterly`, `semiannual`, `calendar_year`, and `card_year` reset periods.
+  - Added `backend/tests/seeds/test_seed_data.py` validating structure, minimum counts, natural-key references, non-overlapping dates, required rule examples, fictional labeling, and absence of real issuer/merchant names or 13–19 digit sequences.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/seeds/test_seed_data.py`: 6 passed in 0.25s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 253 passed in 10.00s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev mypy app tests/seeds`: Success: no issues found in 29 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 57 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Fictional YAML seed catalog (≥6 products, currencies, categories, merchants, sources, rules with superseded/capped/exclusion/threshold examples, and benefits) validated against SPEC §4.2. Satisfied.

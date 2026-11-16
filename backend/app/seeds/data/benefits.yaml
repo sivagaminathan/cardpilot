@@ -1,0 +1,67 @@
+# Fictional card benefit definitions for CardPilot demo (T24).
+# Covers credit, allowance, and perk benefit types across seeded card products.
+benefits:
+  - card_product:
+      issuer_name: Northwind Bank
+      name: Northwind Dining & Travel
+    name: Monthly Dining Credit
+    benefit_type: credit
+    value_cents: 1500
+    reset_period: monthly
+    notes: Fictional $15 monthly statement credit for dining purchases.
+    source_title: Northwind Bank Sample Catalog (Fictional)
+    effective_from: "2026-01-01"
+    effective_to: null
+    is_fictional: true
+
+  - card_product:
+      issuer_name: Skyward Financial
+      name: Skyward Miles Explorer
+    name: Semiannual Checked Bag Allowance
+    benefit_type: allowance
+    value_cents: 5000
+    reset_period: semiannual
+    notes: Fictional $50 semiannual allowance for baggage fees on Starlight Air.
+    source_title: Skyward Financial Sample Catalog (Fictional)
+    effective_from: "2026-01-01"
+    effective_to: null
+    is_fictional: true
+
+  - card_product:
+      issuer_name: Skyward Financial
+      name: Skyward Miles Explorer
+    name: Priority Boarding Perk
+    benefit_type: perk
+    value_cents: null
+    reset_period: card_year
+    notes: Fictional priority boarding perk for cardholders.
+    source_title: Skyward Financial Sample Catalog (Fictional)
+    effective_from: "2026-01-01"
+    effective_to: null
+    is_fictional: true
+
+  - card_product:
+      issuer_name: Horizon Bancorp
+      name: Horizon Summit Points
+    name: Quarterly Streaming Credit
+    benefit_type: credit
+    value_cents: 2500
+    reset_period: quarterly
+    notes: Fictional $25 quarterly credit for streaming subscriptions.
+    source_title: Horizon Bancorp Sample Catalog (Fictional)
+    effective_from: "2026-01-01"
+    effective_to: null
+    is_fictional: true
+
+  - card_product:
+      issuer_name: Horizon Bancorp
+      name: Horizon Summit Points
+    name: Annual Travel Incidentals Credit
+    benefit_type: credit
+    value_cents: 10000
+    reset_period: calendar_year
+    notes: Fictional $100 calendar-year travel incidentals credit.
+    source_title: Horizon Bancorp Sample Catalog (Fictional)
+    effective_from: "2026-01-01"
+    effective_to: null
+    is_fictional: true

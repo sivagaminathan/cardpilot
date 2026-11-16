@@ -1,0 +1,27 @@
+# Fictional reward currencies for CardPilot demo (T24).
+# All values are illustrative sample data only — not real issuer terms.
+currencies:
+  - code: NW_CASH
+    name: Northwind Cash Back
+    kind: cash_back
+    is_cash_equivalent: true
+    default_cents_per_unit: "1.0000"
+    is_fictional: true
+  - code: NWT_PTS
+    name: Northwind Flexible Points
+    kind: points
+    is_cash_equivalent: false
+    default_cents_per_unit: "1.5000"
+    is_fictional: true
+  - code: SKY_MILES
+    name: Skyward Miles
+    kind: miles
+    is_cash_equivalent: false
+    default_cents_per_unit: "1.2000"
+    is_fictional: true
+  - code: HORIZON_PTS
+    name: Horizon Summit Points
+    kind: points
+    is_cash_equivalent: false
+    default_cents_per_unit: "1.2500"
+    is_fictional: true

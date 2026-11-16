@@ -1,0 +1,36 @@
+# Fictional merchants for CardPilot demo (T24).
+# No real merchant or issuer names.
+merchants:
+  - name: Bistro Sol
+    default_category_code: dining
+    tags:
+      - restaurant
+  - name: Harbor Roasters
+    default_category_code: dining
+    tags:
+      - cafe
+  - name: Greenleaf Market
+    default_category_code: groceries
+    tags:
+      - supermarket
+  - name: BulkDepot Club
+    default_category_code: groceries
+    tags:
+      - warehouse_club
+      - big_box
+  - name: Megamart Express
+    default_category_code: online_retail
+    tags:
+      - big_box
+  - name: SunFuel Station
+    default_category_code: gas
+    tags:
+      - fuel
+  - name: CloudStream Media
+    default_category_code: streaming
+    tags:
+      - subscription
+  - name: Starlight Air
+    default_category_code: travel
+    tags:
+      - airline

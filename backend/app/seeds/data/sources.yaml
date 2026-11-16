@@ -1,0 +1,28 @@
+# Fictional rule and benefit sources for CardPilot demo (T24).
+# Every source is explicitly marked fictional_sample and not current issuer terms.
+sources:
+  - title: Northwind Bank Sample Catalog (Fictional)
+    kind: fictional_sample
+    url: null
+    last_reviewed_on: "2026-01-15"
+    notes: Fictional sample catalog for CardPilot demo. Not real or current issuer terms.
+  - title: Skyward Financial Sample Catalog (Fictional)
+    kind: fictional_sample
+    url: null
+    last_reviewed_on: "2026-02-01"
+    notes: Fictional sample catalog for CardPilot demo. Not real or current issuer terms.
+  - title: Meridian Trust Sample Catalog (Fictional)
+    kind: fictional_sample
+    url: null
+    last_reviewed_on: "2026-01-20"
+    notes: Fictional sample catalog for CardPilot demo. Not real or current issuer terms.
+  - title: Verdant Credit Union Sample Catalog (Fictional)
+    kind: fictional_sample
+    url: null
+    last_reviewed_on: "2026-03-01"
+    notes: Fictional sample catalog for CardPilot demo. Not real or current issuer terms.
+  - title: Horizon Bancorp Sample Catalog (Fictional)
+    kind: fictional_sample
+    url: null
+    last_reviewed_on: "2026-02-15"
+    notes: Fictional sample catalog for CardPilot demo. Not real or current issuer terms.
