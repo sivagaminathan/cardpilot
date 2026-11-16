@@ -1,0 +1,36 @@
+# Render Blueprint for CardPilot — Development Environment Only
+# External Neon PostgreSQL is supplied via DATABASE_URL in the Render dashboard.
+services:
+  - type: web
+    name: cardpilot-api-dev
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install .
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: ENVIRONMENT
+        value: development
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        value: https://cardpilot-web-dev.onrender.com
+      - key: DATABASE_URL
+        sync: false
+
+  - type: web
+    name: cardpilot-web-dev
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeploy: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://cardpilot-api-dev.onrender.com/api/v1
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

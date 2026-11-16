@@ -733,3 +733,13 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `uv run --directory backend --extra dev ruff check .`: All checks passed.
   - `uv run --directory backend --extra dev ruff format --check .`: 58 files already formatted.
   - `git diff --check`: Clean (0 whitespace/formatting errors).
+
+## Deployment Task 2 — Render Development Blueprint (`render.yaml`) (2026-11-16)
+- **What was done:**
+  - Verified CI run `43903299964` (`fix(config): normalize Neon PostgreSQL URLs`) completed with `success`.
+  - Added `render.yaml` for the **development environment only**:
+    - `cardpilot-api-dev` (Python web service, `plan: free`, `rootDir: backend`, `buildCommand: pip install --upgrade pip && pip install .`, `startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT` — migrations execute at service startup because Render's free plan does not support `preDeployCommand`, `healthCheckPath: /healthz`, `autoDeploy: false`, `ENVIRONMENT=development`, `LOG_LEVEL=INFO`, `CORS_ORIGINS=https://cardpilot-web-dev.onrender.com`, `DATABASE_URL` with `sync: false`).
+    - `cardpilot-web-dev` (Static site, `rootDir: frontend`, `buildCommand: npm ci && npm run build`, `staticPublishPath: dist`, `autoDeploy: false`, `VITE_API_BASE_URL=https://cardpilot-api-dev.onrender.com/api/v1`, SPA rewrite `/* -> /index.html`).
+- **Validation:**
+  - Parsed `render.yaml` with `yaml.safe_load` cleanly.
+  - `git diff --check`: Clean.
