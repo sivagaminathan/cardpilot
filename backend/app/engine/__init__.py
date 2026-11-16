@@ -54,6 +54,10 @@ from app.engine.units import (
     UnitsResult,
     calculate_reward_units,
 )
+from app.engine.valuation import (
+    ValuationResult,
+    evaluate_valuation,
+)
 
 __all__ = [
     "ApplicabilityResult",
@@ -82,11 +86,13 @@ __all__ = [
     "UnitsResult",
     "UnrankedReason",
     "Valuation",
+    "ValuationResult",
     "allocate_purchase_across_caps",
     "calculate_reward_units",
     "check_rule_applicability",
     "create_no_applicable_rule_evaluation",
     "create_no_effective_rule_evaluation",
+    "evaluate_valuation",
     "filter_applicable_rules",
     "filter_effective_rules",
     "get_period_bounds",

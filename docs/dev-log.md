@@ -517,3 +517,31 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Units calculation and rounding modes (`floor_units`, `nearest_unit`, `none_4dp`) with Decimal implemented and verified with table-driven tests including half cases. Satisfied.
+
+
+### Task T17: Valuation & No-Valuation Routing (AC-2)
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement pure valuation math (`ROUND_HALF_EVEN` cents) and no-valuation routing to `CardStatus.UNRANKED` per BACKLOG T17, SPEC FR-13/FR-14/AC-2, and ARCHITECTURE §4.2 step 6.
+- **Implementation Details:**
+  - Created `backend/app/engine/valuation.py`:
+    - `ValuationResult`: Frozen, slotted dataclass (`status`, `estimated_value_cents`, `valuation_used`, `rejection_reason`, `rejection_message`, `warnings`, `trace_step`) validating `estimated_value_cents` (non-negative int, rejecting bool/float), status invariants (`RANKED` vs `UNRANKED`), and normalizing `warnings` via `_normalize_sequence`.
+    - `evaluate_valuation(reward_units, reward_currency, valuation)`:
+      - When `valuation` is present: normalizes and validates currency match (`ValueError` on mismatch), computes `(reward_units * valuation.cents_per_unit).quantize(Decimal("1"), rounding=ROUND_HALF_EVEN)` into `estimated_value_cents`, returns `CardStatus.RANKED`, emits `"illustrative default valuation"` warning when `not valuation.is_user_set`, and emits a deterministic `TraceStep`.
+      - When `valuation` is `None`: routes to `CardStatus.UNRANKED` with `estimated_value_cents=None`, `rejection_reason=UnrankedReason.NO_VALUATION.value`, and the exact documented limitation message from ARCHITECTURE.md.
+  - Exported `ValuationResult` and `evaluate_valuation` from `backend/app/engine/__init__.py`.
+  - Added 16 table-driven and unit tests in `backend/tests/engine/test_valuation.py` covering exact cents, half-even ties rounding both up and down (`0.5->0`, `1.5->2`, `2.5->2`, `3.5->4`), zero units, default-valuation warning vs user-set valuation, currency normalization/mismatch, `no_valuation` routing/message, float/bool/empty-currency rejection, determinism, and immutability.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Specified `ValuationResult` fields, `.strip().casefold()` currency matching, `ROUND_HALF_EVEN`, `"illustrative default valuation"` warning, and exact ARCHITECTURE.md `no_valuation` message.
+  - **AI Executed:** Followed test-first TDD, implemented pure Decimal valuation and routing, verified all tests and static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_valuation.py tests/engine/test_no_float.py`: 18 passed in 0.21s.
+  - `uv run --directory backend --extra dev pytest tests/engine`: 186 passed (all engine tests).
+  - `uv run --directory backend --extra dev pytest`: 191 passed, 1 failed (`tests/api/test_readiness.py::test_readyz_healthy_db` returned 503 because local Postgres was not running).
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 9 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 22 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 41 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Valuation → estimated value (`ROUND_HALF_EVEN`) and `no_valuation` routing to `UNRANKED` implemented and verified against AC-2. Satisfied.
