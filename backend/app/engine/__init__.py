@@ -8,6 +8,11 @@ from app.engine.applicability import (
     check_rule_applicability,
     filter_applicable_rules,
 )
+from app.engine.caps import (
+    CapAllocationResult,
+    CapPortion,
+    allocate_purchase_across_caps,
+)
 from app.engine.effective import (
     create_no_effective_rule_evaluation,
     filter_effective_rules,
@@ -50,6 +55,8 @@ __all__ = [
     "ApplicabilityResult",
     "AppliedPortion",
     "Cap",
+    "CapAllocationResult",
+    "CapPortion",
     "CardContext",
     "CardEvaluation",
     "CardStatus",
@@ -70,6 +77,7 @@ __all__ = [
     "TraceStep",
     "UnrankedReason",
     "Valuation",
+    "allocate_purchase_across_caps",
     "check_rule_applicability",
     "create_no_applicable_rule_evaluation",
     "create_no_effective_rule_evaluation",

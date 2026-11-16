@@ -420,3 +420,39 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Period utilities for monthly, quarterly, calendar year, and card-year boundaries implemented with table tests including leap day and year-end. Satisfied.
+
+
+### Task T14: Cap Handling, Straddle, and Fallback (AC-5)
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement pure cap allocation including straddle splitting and iterative fallback to next-best eligible rules per SPEC AC-5, FR-11, and ARCHITECTURE §4.2 step 4, kept separate from reward-unit calculation and rounding (T16).
+- **Implementation Details:**
+  - Created `backend/app/engine/caps.py`:
+    - `CapPortion`: Frozen, slotted dataclass holding `rule: EarningRule`, `amount_cents: int` (validated strictly positive), and `cap_group_key: str | None`.
+    - `CapAllocationResult`: Frozen, slotted dataclass holding `portions`, `unallocated_cents` (validated non-negative integer), and `trace_steps`, enforcing runtime immutability via `_normalize_sequence`.
+    - `allocate_purchase_across_caps(purchase, rules, caps, spend_history)`: Runs `filter_applicable_rules` upfront and validates that every applicable rule with a non-null `cap_group_key` has a matching entry in `cap_map` (raising `ValueError` otherwise). Iteratively excludes exhausted cap groups, reruns deterministic selection (`select_best_rule`), allocates `min(remaining_amount_cents, cap_remaining)` (or full remaining amount if uncapped), and records any unallocated remainder explicitly if no eligible fallback exists.
+  - Exported `CapPortion`, `CapAllocationResult`, and `allocate_purchase_across_caps` from `backend/app/engine/__init__.py`.
+  - Added 14 unit tests in `backend/tests/engine/test_caps.py`:
+    - AC-5 exact straddle scenario ($500 quarterly cap, $450 spent, $100 purchase -> $50 @ 5x + $50 @ 1x).
+    - Purchase entirely within remaining cap.
+    - Cap exactly exhausted without fallback.
+    - Pre-exhausted cap falling back to base.
+    - Missing cap configuration raising `ValueError` (both winning and non-winning applicable rules).
+    - Shared `cap_group_key` across multiple rules preventing cap reuse after straddle.
+    - Duplicate cap definitions raising `ValueError`.
+    - Multiple successive exhausted/straddled cap groups falling back to base.
+    - Empty `rules=()` and no-eligible-fallback leaving explicit `unallocated_cents` and `no_fallback_rule` trace.
+    - Determinism across rule input orderings, runtime immutability, and `CapPortion`/`CapAllocationResult` validation.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Kept cap allocation separate from `AppliedPortion.reward_units` / rounding (T16), required `ValueError` on missing cap config across all applicable rules, iterative fallback across exhausted cap groups, and explicit `unallocated_cents` when no fallback exists.
+  - **AI Executed:** Followed test-first TDD, implemented pure integer-cent cap allocation, applied review correction for upfront cap validation, and verified all tests and static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_caps.py`: 14 passed in 0.18s.
+  - `uv run --directory backend --extra dev pytest`: 135 passed in 0.75s (includes `test_no_float.py`).
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 7 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 20 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 37 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Cap handling including straddle and fallback to base implemented and verified against AC-5. Satisfied.
