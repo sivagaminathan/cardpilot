@@ -1,0 +1,2 @@
+"""Idempotent seed data loader."""
+
