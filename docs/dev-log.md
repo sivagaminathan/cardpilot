@@ -185,3 +185,30 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
     - `npm test`: 9 passed in 4.40s.
 - **Acceptance Criteria [Done when]:**
   - Both jobs green on a PR/push. Satisfied on GitHub Actions (Run ID `43798948931` on `main`: Backend passed in 42s, Frontend passed in 37s).
+
+### Task T07: Agent Role Files Setup (.claude/agents/)
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** Create specialized subagent role files (`planner.md`, `implementer.md`, `qa.md`, `security.md`) in `.claude/agents/` derived from `AGENTS.md` and `ARCHITECTURE.md`.
+- **Implementation Details:**
+  - Created `.claude/agents/planner.md`: Specifies requirements refinement, task decomposition, and acceptance criteria planning without writing application code.
+  - Created `.claude/agents/implementer.md`: Specifies one-task-at-a-time execution with test-first development, strict adherence to existing architecture and stack, and prohibition of test weakening or scope expansion.
+  - Created `.claude/agents/qa.md`: Specifies independent verification, regression execution, and edge-case testing (dates, caps, thresholds, rounding, currency isolation) without altering application code or weakening tests.
+  - Created `.claude/agents/security.md`: Specifies compliance checks for fictional data, sensitive financial data protection (AC-12), secret scanning, CORS validation, security headers, and dependency audits without adding features.
+  - All role definitions formulated tool/model-agnostic with clear inputs, prohibitions, project-specific invariants, and standardized handoff reporting templates.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Approved T07 scope and plan, ensuring separation of concerns and governance standards across future phases.
+  - **AI Executed:** Authored all four role definition files and updated the development log.
+- **Verification & Testing (Actual Results):**
+  - Confirmed all four role files exist with explicit scopes and limitations.
+  - `git diff --check`: Passed (0 whitespace/formatting errors).
+  - Backend pytest: 6 passed in 0.33s.
+  - Frontend vitest: 9 passed in 4.15s.
+- **Acceptance Criteria [Done when]:**
+  - Files committed; roles' scope/limits stated. Satisfied.
+
+---
+
+## Phase 1 Review & Gate G1 Status
+- **Phase 1 Summary:** All foundation tasks (T01 repository foundation, T02 backend skeleton, T03 frontend skeleton, T04 Docker Compose stack, T05 SQLAlchemy + Alembic, T06 GitHub Actions CI, T07 role files) are complete, verified locally and in CI.
+- **Gate G1:** Ready for human review of skeleton + CI before domain work begins in Phase 2 (Reward engine).
