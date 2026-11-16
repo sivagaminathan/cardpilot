@@ -18,13 +18,29 @@ Choosing the best credit card at checkout is error-prone when cards earn differe
 
 > **Note:** Render free-tier services sleep after inactivity; the first request may take 30–60 seconds to wake up.
 
-### Reviewer Walkthrough (Live App)
-1. Open https://cardpilot-web-dev.onrender.com.
-2. On the **Dashboard** tab, verify the backend status indicator shows healthy connectivity and review the fictional-data disclaimer banner.
-3. Switch to the **Compare** tab (`Compare Cards for Purchase`):
-   - Select a demo profile (`maya` — *Maya — The Optimizer*, or `dev` — *Dev — Benefit Tracker*).
-   - Enter a purchase amount (e.g. `$125.00`), category (`groceries`), and date (`2026-08-15`), then submit.
-   - Inspect **Ranked Cards** (e.g. `Grocery 5x` at 5x with estimated dollar value), **Unranked Cards** (`Skyward Explorer` when no `SKY_MILES` valuation is set), and the expandable per-card **Calculation Explanation** trace.
+### Working Demo — Compare Cards
+
+- **Live Frontend:** https://cardpilot-web-dev.onrender.com
+- **Live API Docs:** https://cardpilot-api-dev.onrender.com/docs
+
+1. Open the deployed frontend at https://cardpilot-web-dev.onrender.com.
+2. Confirm the header displays **API Connected** (`GET /healthz`).
+3. Select **Maya** (`maya`) in the Demo Profile selector.
+4. Click **Compare Card for Purchase** (or the **Compare** navigation tab).
+5. Enter:
+   - **Amount:** `$125.00`
+   - **Category:** `Groceries`
+   - **Date:** `2026-08-15`
+6. Click **Compare Cards**.
+7. The frontend calls `POST /api/v1/profiles/{profile_key}/recommendations` and renders ranked and unranked recommendations with per-card explanations (covering applicability, rule selection, cap allocation, rounding, and reward valuation).
+
+Observed results for this purchase:
+- **#1 Grocery 5x** — `625 NW_CASH` (`$6.25`)
+- **#2 Dining & Travel** — `125 NWT_PTS` (`$1.88`)
+- **#3 Daily Cash** — `125 NW_CASH` (`$1.25`)
+- **Skyward Explorer** — `125 SKY_MILES`, **unranked** because no dollar valuation is configured for `SKY_MILES`.
+
+*(Global note returned by the engine: annual fees and benefit credits are not included in this comparison.)*
 
 ---
 
@@ -183,8 +199,9 @@ This walkthrough reproduces a controlled non-production failure, observes it in 
 
 ## 5. Tests, Quality Checks & E2E Scope
 
-- **Backend Pytest:** Unit, engine, seed, telemetry, webhook relay, and real PostgreSQL DB/API integration tests (`backend/tests/`), enforcing **>= 90%** branch coverage on `backend/app/engine/`.
-- **Frontend Vitest:** Component & UI state tests (`frontend/src/App.test.tsx`).
+- **Backend Pytest:** Unit, engine, seed, telemetry, webhook relay, and real PostgreSQL DB/API integration tests (`backend/tests/`), enforcing **>= 90%** branch coverage on `backend/app/engine/` (**288 tests passed**, **96.78%** engine branch coverage in the latest reported run).
+- **Frontend Vitest:** Component & UI state tests (`frontend/src/App.test.tsx`; **11 tests passed** in the latest reported run).
+- **Manual Browser Verification:** The Maya **Compare Cards** journey (Section 1) was manually verified against the deployed Render application.
 - **Automated Browser E2E:** **Not implemented** (`make e2e` is a placeholder for `T46/T47`; no Playwright config or browser E2E suite exists). The incident walkthrough in Section 4 is a manual/scripted operational demonstration, not a Playwright test.
 
 ### Running Automated Tests
@@ -231,7 +248,13 @@ npm --prefix frontend test
 
 - **Fictional data only:** All profiles, issuers, card products, rules, and valuations are fictional sample data for demonstration only, not current issuer terms or financial advice.
 - **Render free tier:** Hosted development services sleep when idle (30–60s cold starts).
+- **Static Dashboard:** The **Dashboard** tab currently displays static demonstration data in frontend state rather than querying the backend API.
+- **Phase 4 placeholders:** The **Cards**, **Transactions**, **Benefits**, **Rewards**, and **Settings** tabs — as well as the **Manage Cards** and **Record Purchase** buttons on the Dashboard — navigate to Phase 4 placeholder screens.
+- **Demo profile coverage:** The demo profile selector includes **Rivera** (`rivera`), which is not seeded in the backend and returns HTTP `404` in **Compare Cards**; **Maya** (`maya`) and **Dev** (`dev`) are supported.
+- **Unconfigured `SKY_MILES` valuation:** `Skyward Explorer`'s `SKY_MILES` valuation is not configured; the API message suggests setting a valuation in **Settings**, which is currently a Phase 4 placeholder.
+- **Stateless comparison:** Comparing a purchase is a recommendation operation only and does not record or persist an actual transaction.
+- **Excluded card economics:** Annual fees and benefit credits are not included in the recommendation calculation.
 - **Grafana Cloud not configured:** Live telemetry and alerting are demonstrated using the local Docker Compose observability stack; Grafana Cloud is optional and unconfigured.
 - **Grafana webhook provisioning:** Local Grafana provisions `alerts.yml` only; contact points/notification policies require manual UI setup if testing alert-triggered webhooks locally.
-- **On-call agent scope:** `oncall_agent.py` generates an incident investigation report PR under `docs/incidents/` for human review; it does not automatically patch application code or auto-merge PRs.
-- **Browser E2E tests:** Playwright E2E (`make e2e`) is not yet implemented.
+- **On-call agent scope:** `oncall_agent.py` is an incident investigation and reporting agent that creates a branch and PR under `docs/incidents/` for human review; it is not an autonomous code-remediation agent and does not auto-merge PRs.
+- **No automated browser E2E test:** Automated browser E2E tests are not implemented; the documented **Compare Cards** walkthrough was manually verified against the deployed Render application.
