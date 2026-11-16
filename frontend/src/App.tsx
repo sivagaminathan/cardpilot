@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CompareView } from './components/CompareView';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -20,6 +21,8 @@ export const App: React.FC = () => {
       <main className="main-content" id="main-content" tabIndex={-1}>
         {activeTab === 'dashboard' ? (
           <Dashboard profileId={currentProfileId} onNavigateTab={setActiveTab} />
+        ) : activeTab === 'compare' ? (
+          <CompareView profileId={currentProfileId} />
         ) : (
           <section className="section-card placeholder-card">
             <h2 className="section-title">

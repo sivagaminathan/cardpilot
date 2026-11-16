@@ -1,0 +1,65 @@
+# Fictional demo profiles for CardPilot (T25).
+profiles:
+  - seed_key: demo.maya
+    slug: maya
+    display_name: "Maya — The Optimizer"
+    is_demo: true
+    cards:
+      - card_product:
+          issuer_name: Northwind Bank
+          name: Northwind Cash Everyday
+        nickname: Daily Cash
+        opened_on: "2025-02-01"
+      - card_product:
+          issuer_name: Northwind Bank
+          name: Northwind Dining & Travel
+        nickname: Dining & Travel
+        opened_on: "2025-05-15"
+      - card_product:
+          issuer_name: Skyward Financial
+          name: Skyward Miles Explorer
+        nickname: Skyward Explorer
+        opened_on: "2025-08-01"
+      - card_product:
+          issuer_name: Verdant Credit Union
+          name: Verdant Grocery Specialist
+        nickname: Grocery 5x
+        opened_on: "2025-09-01"
+    valuations:
+      - reward_currency_code: NW_CASH
+        cents_per_unit: "1.0000"
+        is_user_set: false
+      - reward_currency_code: NWT_PTS
+        cents_per_unit: "1.5000"
+        is_user_set: true
+
+  - seed_key: demo.dev
+    slug: dev
+    display_name: "Dev — Benefit Tracker"
+    is_demo: true
+    cards:
+      - card_product:
+          issuer_name: Horizon Bancorp
+          name: Horizon Summit Points
+        nickname: Summit Points
+        opened_on: "2025-01-10"
+      - card_product:
+          issuer_name: Skyward Financial
+          name: Skyward Miles Explorer
+        nickname: Skyward Miles
+        opened_on: "2025-04-01"
+      - card_product:
+          issuer_name: Meridian Trust
+          name: Meridian Flat 2%
+        nickname: Flat 2%
+        opened_on: "2025-06-01"
+    valuations:
+      - reward_currency_code: NW_CASH
+        cents_per_unit: "1.0000"
+        is_user_set: false
+      - reward_currency_code: HORIZON_PTS
+        cents_per_unit: "1.2500"
+        is_user_set: true
+      - reward_currency_code: SKY_MILES
+        cents_per_unit: "1.2000"
+        is_user_set: true

@@ -88,11 +88,13 @@ describe('CardPilot App and Dashboard', () => {
     const compareNavButton = screen.getByRole('button', { name: /^Compare$/i });
     fireEvent.click(compareNavButton);
 
-    expect(screen.getByRole('heading', { level: 2, name: /Compare View/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Compare Cards for Purchase/i }),
+    ).toBeInTheDocument();
 
-    // Click Return to Dashboard button
-    const returnButton = screen.getByRole('button', { name: /Return to Dashboard/i });
-    fireEvent.click(returnButton);
+    // Return to Dashboard via header nav
+    const dashboardNavButton = screen.getByRole('button', { name: /^Dashboard$/i });
+    fireEvent.click(dashboardNavButton);
 
     expect(screen.getByRole('heading', { level: 2, name: /Cardholder Portfolio Overview/i })).toBeInTheDocument();
 

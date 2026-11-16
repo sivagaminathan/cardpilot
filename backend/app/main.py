@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.deps import get_db_session
-from app.api.errors import http_exception_handler, validation_exception_handler
+from app.api.errors import (
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
 from app.api.routes import api_router
 from app.config import Settings, get_settings
 from app.db import check_db_health, close_engine
@@ -54,6 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Register error handlers
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
 
     # Unversioned health check endpoint
     @app.get("/healthz", tags=["meta"], summary="Liveness probe")
@@ -93,6 +98,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Mount versioned API routes
     app.include_router(api_router)
+    if settings is not None:
+        app.dependency_overrides[get_settings] = lambda: app_settings
 
     # Configure structured logging, /metrics, and OpenTelemetry tracing/metrics
     setup_telemetry(app, app_settings)

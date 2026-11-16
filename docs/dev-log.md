@@ -781,3 +781,14 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `uv run --directory backend --extra dev ruff check .`: All checks passed.
   - `uv run --directory backend --extra dev ruff format --check .`: 60 files already formatted.
   - `git diff --check`: Clean (0 whitespace/formatting errors).
+
+## Mission Completion Phases — Local Observability, E2E Recommendation, Alerting & On-Call Agent (2026-11-16)
+- **What was done:**
+  - **Local Observability Pipeline:** Fixed `observability/otel-collector.yaml` (`loki` -> `otlphttp/loki`), `observability/tempo.yaml`, `observability/loki.yaml`, and `observability/grafana/provisioning/datasources/datasources.yml` (explicit `uid`s + `derivedFields` + `tracesToLogsV2`). Added `observability/grafana/dashboards/cardpilot-api.json` + dashboard provisioning, updated `docker-compose.yml` to `otel/opentelemetry-collector-contrib:0.120.0` with `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318`, and verified live metrics, traces, and correlated `trace_id` logs across Prometheus, Tempo, Loki, and Grafana.
+  - **E2E Recommendation & Controlled Incident:** Added `backend/app/seeds/data/profiles.yaml`, `backend/app/seeds/loader.py`, `backend/app/schemas/recommendations.py`, `backend/app/services/recommendations.py`, `backend/app/api/recommendations.py`, `unhandled_exception_handler` in `backend/app/api/errors.py`, `DEV_FAULT_INJECT_RECOMMENDATIONS` (blocked in `production`) in `backend/app/config.py`, and `frontend/src/components/CompareView.tsx` wired into `frontend/src/App.tsx`.
+  - **Alerting, On-Call Agent & Docs:** Added `observability/grafana/provisioning/alerting/alerts.yml`, `.github/scripts/oncall_agent.py`, `.github/workflows/oncall-agent.yml`, `docs/observability-grafana-cloud.md`, `docs/submission-evidence.md`, and updated `README.md` and `Makefile`.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 271 passed in 8.43s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 33 source files.
+  - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (65 files).
+  - `npm --prefix frontend run lint`, `build`, `test`: Passed (0 errors, 11/11 tests).

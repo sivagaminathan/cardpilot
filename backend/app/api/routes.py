@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
-api_router = APIRouter(prefix="/api/v1")
+from app.api.recommendations import router as recommendations_router
 
-# Route endpoints will be registered in subsequent tasks
+api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(recommendations_router)

@@ -27,6 +27,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-cardpilot}
       CORS_ORIGINS: http://localhost:5173
+      OTEL_SERVICE_NAME: cardpilot-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -66,13 +68,16 @@ services:
   # Observability (optional — only active with: docker compose --profile observability up)
   # -------------------------------------------------------------------
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.115.0
+    image: otel/opentelemetry-collector-contrib:0.120.0
     profiles: [observability]
     volumes:
       - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
     ports:
       - "4317:4317"
       - "4318:4318"
+    depends_on:
+      - tempo
+      - loki
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -107,6 +112,7 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
     ports:
       - "${GRAFANA_PORT:-3000}:3000"
     depends_on:

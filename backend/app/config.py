@@ -89,6 +89,26 @@ class Settings(BaseSettings):
     )
     otel_exporter_otlp_headers: str | None = Field(default=None, alias="OTEL_EXPORTER_OTLP_HEADERS")
 
+    # Controlled development fault injection (impossible in production)
+    dev_fault_inject_recommendations: bool = Field(
+        default=False, alias="DEV_FAULT_INJECT_RECOMMENDATIONS"
+    )
+
+    @property
+    def is_dev_fault_injection_active(self) -> bool:
+        """Return True only when fault injection is enabled outside production."""
+        return (
+            self.dev_fault_inject_recommendations
+            and self.environment.strip().lower() != "production"
+        )
+
+    @property
+    def is_dev_fault_injection_active(self) -> bool:
+        """Return True only when fault injection is enabled outside production."""
+        return (
+            self.dev_fault_inject_recommendations and self.environment.strip().lower() != "production"
+        )
+
     @property
     def cors_origin_list(self) -> list[str]:
         """Return CORS origins parsed as a list of strings."""

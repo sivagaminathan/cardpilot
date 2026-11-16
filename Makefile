@@ -73,7 +73,7 @@ lint: lint-be lint-fe
 # ── Seed & OpenAPI ────────────────────────────────────────────────────────────
 .PHONY: seed
 seed:
-	@echo "Seed loader not yet implemented (T24/T25)."
+	cd backend && python -m app.seeds.loader
 
 .PHONY: openapi
 openapi:

@@ -82,3 +82,19 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
         content=problem.model_dump(exclude_none=True),
         headers={"Content-Type": "application/problem+json"},
     )
+
+
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle unexpected exceptions with RFC 9457 Problem Details without stack traces."""
+    problem = ProblemDetails(
+        type="https://cardpilot.demo/errors/internal-error",
+        title="Internal Server Error",
+        status=500,
+        detail="An unexpected internal error occurred.",
+        instance=str(request.url.path),
+    )
+    return JSONResponse(
+        status_code=500,
+        content=problem.model_dump(exclude_none=True),
+        headers={"Content-Type": "application/problem+json"},
+    )

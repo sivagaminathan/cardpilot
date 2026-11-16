@@ -1,51 +1,67 @@
 # CardPilot
 
-> **CardPilot** is a deterministic, explainable credit card rewards and benefits optimizer built as an AI Dev Tools Zoomcamp final project.
+CardPilot is a deterministic, explainable credit-card rewards and benefits optimizer built with **FastAPI**, **React + TypeScript**, **PostgreSQL**, and **OpenTelemetry**. All profiles, issuers, cards, and merchants are **fictional sample data** for demonstration purposes only.
 
----
+## Architecture
 
-### Important Disclaimer
-**Fictional Data Only.** All card issuers, products, reward programs, rules, merchants, and user profiles used in this application are entirely fictional demo data created for illustrative and testing purposes. CardPilot does not represent actual credit card terms and does not provide financial advice. Never input real card numbers, CVVs, expiration dates, or bank credentials into this application.
+- **Frontend (`frontend/`):** React 18, TypeScript (strict), Vite SPA (`Dashboard` + `Compare Cards for Purchase` flow).
+- **Backend (`backend/`):** Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.0 (async `asyncpg`), Alembic migrations, and a pure `Decimal`/integer-cents reward engine (`backend/app/engine/`).
+- **Database:** PostgreSQL 16 (Docker Compose locally; Neon PostgreSQL in deployment).
+- **Observability (`observability/`):** OpenTelemetry SDK (traces, metrics, correlated logs) → OTLP/HTTP → OTel Collector → **Tempo** (traces), **Loki** (logs), **Prometheus** (metrics), and **Grafana** (dashboards + alerting).
+- **CI/CD & On-Call (`.github/workflows/`):**
+  - `ci.yml`: Ruff, mypy, Alembic upgrade, pytest (≥90% engine branch coverage), ESLint, tsc/Vite build, Vitest.
+  - `deploy.yml`: Automatic Render development deployment on `main` push after CI succeeds, verified via Render API + `/healthz` & `/readyz` smoke tests.
+  - `oncall-agent.yml` + `.github/scripts/oncall_agent.py`: Investigates Grafana 5xx alerts using Loki/Tempo evidence and opens an incident investigation PR.
 
----
+## Live Development Deployment
 
-## Overview
+- **Frontend:** https://cardpilot-web-dev.onrender.com
+- **Backend API:** https://cardpilot-api-dev.onrender.com (`/healthz`, `/readyz`, `/metrics`, `/docs`)
 
-People managing multiple rewards cards face three key challenges:
-1. **Purchase Optimization:** Determining the optimal card for a given purchase, category, or merchant when currencies (cash back, points, miles) and rules (caps, thresholds, exclusions) differ.
-2. **Benefit Tracking:** Remembering statement credits, allowances, and annual perks before reset dates expire.
-3. **Reward Visibility:** Tracking and estimating total reward balances separated cleanly by currency without misleading cross-currency sums.
+## Running Locally (Docker Compose)
 
-CardPilot solves these challenges through:
-- **A Pure, Deterministic Engine:** Mathematical evaluation with no clock, database, or network side effects.
-- **Explainable Traces:** Every calculation produces a step-by-step human-readable audit trail explaining rule selection, exclusions, caps, and rounding.
-- **Strict Separation of Currencies:** Points, miles, and cash back are never conflated; cross-currency ranking only occurs through explicit user-configured valuations.
-- **Immutable Snapshots:** Transaction records preserve the exact rule version, multiplier, and valuation active at calculation time.
+1. Copy `.env.example` to `.env`.
+2. Start the full application + observability stack:
+   ```bash
+   docker compose --profile observability up -d --build
+   ```
+3. Run migrations and seed demo data:
+   ```bash
+   uv run --directory backend --extra dev alembic upgrade head
+   uv run --directory backend --extra dev python -m app.seeds.loader
+   ```
+4. Open:
+   - Frontend: http://localhost:5173
+   - Backend API / Docs: http://localhost:8000/docs
+   - Grafana: http://localhost:3000 (`CardPilot API Observability` dashboard)
+   - Prometheus: http://localhost:9090
 
----
+## Running Tests
 
-## Tech Stack
+```powershell
+# Backend (unit + PostgreSQL integration + >=90% engine branch coverage)
+uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing
+uv run --directory backend --extra dev mypy app
+uv run --directory backend --extra dev ruff check .
+uv run --directory backend --extra dev ruff format --check .
 
-- **Backend:** Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic
-- **Database:** PostgreSQL (Docker locally, Neon in production)
-- **Frontend:** React, TypeScript (strict), Vite, TanStack Query
-- **Observability:** OpenTelemetry (OTel), Prometheus, Grafana, Loki, Tempo
-- **Testing:** Pytest (table-driven engine tests, AsyncClient with Postgres), Vitest, Playwright
+# Frontend (ESLint, TypeScript + Vite build, Vitest)
+npm --prefix frontend run lint
+npm --prefix frontend run build
+npm --prefix frontend test
+```
 
----
+## Reproducing the Controlled Incident & On-Call Agent
 
-## Project Documentation
+1. Enable `DEV_FAULT_INJECT_RECOMMENDATIONS=true` in development (`ENVIRONMENT=development`; automatically ignored if `ENVIRONMENT=production`).
+2. Submit a recommendation request (`POST /api/v1/profiles/maya/recommendations` or via the **Compare** tab). The API returns HTTP `500` and emits `recommendation.fault_injected` with `trace_id`.
+3. Grafana alert `CardPilot API High 5xx Error Rate` (`observability/grafana/provisioning/alerting/alerts.yml`) triggers after >2 HTTP 5xx responses in 2 minutes and dispatches `.github/workflows/oncall-agent.yml`.
+4. The on-call agent inspects Loki/Tempo telemetry and repository code, writes an incident report under `docs/incidents/`, and opens a PR.
+5. Set `DEV_FAULT_INJECT_RECOMMENDATIONS=false` to restore service and resolve the alert.
 
-- [SPEC.md](SPEC.md) — Product specification, user journeys, functional and non-functional requirements, and acceptance criteria.
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Technical architecture, database schema, API design, engine specification, and component interactions.
-- [BACKLOG.md](BACKLOG.md) — Phased task breakdown and sequential implementation roadmap.
-- [AGENTS.md](AGENTS.md) — Operational guidelines, coding standards, and subagent boundaries.
-- [docs/dev-log.md](docs/dev-log.md) — Development log tracking progress, decisions, test results, and AI/human collaboration.
-- [docs/decisions/](docs/decisions/) — Architecture Decision Records (ADRs).
+See [docs/observability-grafana-cloud.md](docs/observability-grafana-cloud.md) for Grafana Cloud OTLP setup and [docs/submission-evidence.md](docs/submission-evidence.md) for certificate mapping.
 
----
+## Known Limitations
 
-## Project Status
-
-- **Phase 0 (Planning):** Approved.
-- **Phase 1 (Foundation):** In progress (Task T01).
+- Free-tier Render instances sleep after inactivity (cold starts up to ~30–60s).
+- Sample rules and valuations are fictional and illustrative only, not current issuer terms or financial advice.

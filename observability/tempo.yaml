@@ -27,13 +27,10 @@ storage:
     backend: local
     block:
       bloom_filter_false_positive: .05
-      index_downsample_bytes: 1000
-      encoding: zstd
     local:
       path: /var/tempo/traces
     wal:
       path: /var/tempo/wal
-      encoding: snappy
     pool:
       max_workers: 100
       queue_depth: 10000
