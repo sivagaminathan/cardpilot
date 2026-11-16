@@ -38,6 +38,8 @@ CardPilot is a deterministic, explainable credit-card rewards and benefits optim
 
 ## Running Tests
 
+If GNU `make` is installed (and PostgreSQL is running locally for backend DB/API integration tests), `make test` runs both the backend Pytest suite (with >=90% engine branch coverage) and the frontend Vitest suite. On Windows without `make`, run the commands directly:
+
 ```powershell
 # Backend (unit + PostgreSQL integration + >=90% engine branch coverage)
 uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing

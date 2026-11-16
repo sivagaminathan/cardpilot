@@ -48,7 +48,7 @@ down-v:
 # ── Backend Tests & Quality ───────────────────────────────────────────────────
 .PHONY: test-be
 test-be:
-	cd backend && python -m pytest
+	uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing
 
 .PHONY: lint-be
 lint-be:
@@ -57,7 +57,7 @@ lint-be:
 # ── Frontend Tests & Quality ──────────────────────────────────────────────────
 .PHONY: test-fe
 test-fe:
-	cd frontend && npm test
+	npm --prefix frontend test
 
 .PHONY: lint-fe
 lint-fe:
