@@ -1,0 +1,242 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-development
+  cancel-in-progress: false
+
+jobs:
+  deploy-dev:
+    name: Deploy Development (Render)
+    runs-on: ubuntu-latest
+    environment: development
+    timeout-minutes: 15
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+
+    steps:
+      - name: Trigger Render deploys and wait until live
+        env:
+          API_HOOK: ${{ secrets.RENDER_DEV_API_DEPLOY_HOOK }}
+          WEB_HOOK: ${{ secrets.RENDER_DEV_WEB_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          import urllib.error
+          import urllib.request
+          from urllib.parse import urlsplit
+
+          IN_PROGRESS = {
+              "created",
+              "queued",
+              "build_in_progress",
+              "pre_deploy_in_progress",
+              "update_in_progress",
+          }
+          TERMINAL_FAILURES = {
+              "build_failed",
+              "update_failed",
+              "pre_deploy_failed",
+              "canceled",
+              "deactivated",
+          }
+
+          api_hook = os.environ.get("API_HOOK", "").strip()
+          web_hook = os.environ.get("WEB_HOOK", "").strip()
+          api_key = os.environ.get("RENDER_API_KEY", "").strip()
+
+          if not api_hook or not web_hook or not api_key:
+              print(
+                  "Error: RENDER_DEV_API_DEPLOY_HOOK, RENDER_DEV_WEB_DEPLOY_HOOK, "
+                  "or RENDER_API_KEY is not configured.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+
+          def extract_service_id(hook_url: str, label: str) -> str:
+              path_part = urlsplit(hook_url).path.rstrip("/").rsplit("/", 1)[-1]
+              if not path_part.startswith("srv-"):
+                  print(f"Error: Could not extract Render service ID from {label} hook.", file=sys.stderr)
+                  sys.exit(1)
+              return path_part
+
+          def api_get_json(url: str, deadline: float | None = None) -> object:
+              url_path = urlsplit(url).path
+              delays = (2, 4, 8)
+              for attempt in range(len(delays) + 1):
+                  req = urllib.request.Request(
+                      url,
+                      headers={
+                          "Authorization": f"Bearer {api_key}",
+                          "Accept": "application/json",
+                      },
+                  )
+                  try:
+                      with urllib.request.urlopen(req, timeout=20) as resp:
+                          return json.loads(resp.read().decode("utf-8"))
+                  except urllib.error.HTTPError as exc:
+                      is_transient = exc.code == 429 or 500 <= exc.code < 600
+                      if not is_transient or attempt == len(delays):
+                          print(
+                              f"Error: Render API GET {url_path} failed with HTTP {exc.code}.",
+                              file=sys.stderr,
+                          )
+                          sys.exit(1)
+                      reason = f"HTTP {exc.code}"
+                  except (
+                      urllib.error.URLError,
+                      TimeoutError,
+                      OSError,
+                      UnicodeDecodeError,
+                      json.JSONDecodeError,
+                  ) as exc:
+                      if attempt == len(delays):
+                          print(
+                              f"Error: Render API GET {url_path} failed ({type(exc).__name__}).",
+                              file=sys.stderr,
+                          )
+                          sys.exit(1)
+                      reason = type(exc).__name__
+
+                  sleep_s = delays[attempt]
+                  if deadline is not None:
+                      remaining = deadline - time.monotonic()
+                      if remaining <= 0:
+                          print(
+                              f"Error: Timed out before retrying Render API GET {url_path}.",
+                              file=sys.stderr,
+                          )
+                          sys.exit(1)
+                      sleep_s = min(sleep_s, remaining)
+                  print(
+                      f"Transient error ({reason}) on {url_path}; retrying in {sleep_s:.1f}s...",
+                      file=sys.stderr,
+                  )
+                  time.sleep(sleep_s)
+
+              sys.exit(1)
+
+          def trigger_deploy(hook_url: str, label: str, deadline: float) -> tuple[str, str]:
+              service_id = extract_service_id(hook_url, label)
+              req = urllib.request.Request(hook_url, method="POST")
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as resp:
+                      status_code = resp.status
+                      raw = resp.read().decode("utf-8")
+              except urllib.error.HTTPError as exc:
+                  print(f"Error: {label} deploy hook returned HTTP {exc.code}.", file=sys.stderr)
+                  sys.exit(1)
+
+              deploy_id = ""
+              if raw.strip():
+                  payload = json.loads(raw)
+                  deploy_id = payload.get("deploy", {}).get("id", "")
+
+              if not deploy_id and status_code == 202:
+                  deploys = api_get_json(
+                      f"https://api.render.com/v1/services/{service_id}/deploys?limit=1",
+                      deadline=deadline,
+                  )
+                  if isinstance(deploys, list) and deploys:
+                      deploy_obj = deploys[0].get("deploy", deploys[0])
+                      deploy_id = deploy_obj.get("id", "")
+
+              if not deploy_id:
+                  print(f"Error: No deploy ID returned for {label}.", file=sys.stderr)
+                  sys.exit(1)
+
+              print(f"Triggered {label} deploy {deploy_id} on {service_id}.")
+              return service_id, deploy_id
+
+          deadline = time.monotonic() + 600  # 10-minute cap (under 15-minute job timeout)
+          targets = {
+              "api": trigger_deploy(api_hook, "api", deadline),
+              "web": trigger_deploy(web_hook, "web", deadline),
+          }
+
+          live_services: set[str] = set()
+
+          while len(live_services) < len(targets):
+              if time.monotonic() >= deadline:
+                  pending = sorted(set(targets) - live_services)
+                  print(f"Error: Timed out waiting for Render deploys: {pending}", file=sys.stderr)
+                  sys.exit(1)
+
+              for name, (service_id, deploy_id) in targets.items():
+                  if name in live_services:
+                      continue
+                  data = api_get_json(
+                      f"https://api.render.com/v1/services/{service_id}/deploys/{deploy_id}",
+                      deadline=deadline,
+                  )
+                  status = data.get("status", "") if isinstance(data, dict) else ""
+                  print(f"{name} ({deploy_id}): status={status}")
+                  if status == "live":
+                      live_services.add(name)
+                  elif status in TERMINAL_FAILURES:
+                      print(f"Error: {name} deploy {deploy_id} failed ({status}).", file=sys.stderr)
+                      sys.exit(1)
+                  elif status not in IN_PROGRESS:
+                      print(f"Error: Unexpected status {status!r} for {name} ({deploy_id}).", file=sys.stderr)
+                      sys.exit(1)
+
+              if len(live_services) < len(targets):
+                  time.sleep(15)
+
+          print("Both Render development deployments are live.")
+          PY
+
+      - name: Smoke test live development services
+        run: |
+          set -euo pipefail
+          API_HEALTH="https://cardpilot-api-dev.onrender.com/healthz"
+          API_READY="https://cardpilot-api-dev.onrender.com/readyz"
+          WEB_URL="https://cardpilot-web-dev.onrender.com/"
+
+          deadline=$((SECONDS + 180))
+
+          while [ "${SECONDS}" -lt "${deadline}" ]; do
+            api_health_ok=false
+            api_ready_ok=false
+            web_ok=false
+
+            if health_body=$(curl -fsS --max-time 20 "${API_HEALTH}"); then
+              if printf '%s' "${health_body}" | python3 -c "import json, sys; d = json.load(sys.stdin); sys.exit(0 if d.get('status') == 'ok' else 1)"; then
+                api_health_ok=true
+              fi
+            fi
+
+            if ready_body=$(curl -fsS --max-time 20 "${API_READY}"); then
+              if printf '%s' "${ready_body}" | python3 -c "import json, sys; d = json.load(sys.stdin); sys.exit(0 if d.get('status') == 'ready' and d.get('database') == 'connected' else 1)"; then
+                api_ready_ok=true
+              fi
+            fi
+
+            if curl -fsS -o /dev/null --max-time 20 "${WEB_URL}"; then
+              web_ok=true
+            fi
+
+            echo "Smoke check: healthz=${api_health_ok} readyz=${api_ready_ok} web=${web_ok}"
+            if [ "${api_health_ok}" = "true" ] && [ "${api_ready_ok}" = "true" ] && [ "${web_ok}" = "true" ]; then
+              echo "All development smoke tests passed."
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Error: Live development smoke tests failed within 180s." >&2
+          exit 1

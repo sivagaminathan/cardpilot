@@ -753,3 +753,13 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `npm --prefix frontend run lint`: Clean.
   - `npm --prefix frontend run build`: Clean (`tsc && vite build`).
   - `npm --prefix frontend test`: Passed.
+
+## Deployment Task 4B/4C — Development CI/CD Automation & Render API Verification (2026-11-16)
+- **What was done:**
+  - Added `.github/workflows/deploy.yml` triggered by `workflow_run` on `CI` (`completed`), running `deploy-dev` only when `conclusion == 'success'`, `head_branch == 'main'`, and `event == 'push'`.
+  - Scoped `deploy-dev` to GitHub Environment `development` with `permissions: contents: read` and `concurrency: deploy-development` (`cancel-in-progress: false`).
+  - Triggers `RENDER_DEV_API_DEPLOY_HOOK` and `RENDER_DEV_WEB_DEPLOY_HOOK` without exposing hook URLs/tokens, captures each new `deploy.id` (including `202` fallback), and polls Render's `GET /v1/services/{serviceId}/deploys/{deployId}` endpoint using `RENDER_API_KEY` (10-minute bounded timeout, with bounded retries/backoff for transient 429/5xx/`URLError`/malformed-JSON responses and immediate failure on permanent 4xx errors) until both deployments reach `live`, failing immediately on terminal failure states (`build_failed`, `update_failed`, `pre_deploy_failed`, `canceled`, `deactivated`).
+  - After both deployments are confirmed `live`, runs a 180s bounded smoke test verifying `/healthz` (`status == "ok"`), `/readyz` (`status == "ready"` and `database == "connected"`), and `https://cardpilot-web-dev.onrender.com/` (HTTP 200).
+- **Validation:**
+  - Parsed `.github/workflows/deploy.yml` with `yaml.safe_load` cleanly.
+  - `git diff --check`: Clean.
