@@ -743,3 +743,13 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
 - **Validation:**
   - Parsed `render.yaml` with `yaml.safe_load` cleanly.
   - `git diff --check`: Clean.
+
+## Deployment Task 3 — Frontend Health Check Base URL Fix (2026-11-16)
+- **What was done:**
+  - Added `frontend/src/vite-env.d.ts` (`/// <reference types="vite/client" />`) for strict TypeScript `import.meta.env` typing.
+  - Updated `frontend/src/components/BackendStatus.tsx` with `getHealthUrl()` to derive `<origin>/healthz` from `import.meta.env.VITE_API_BASE_URL` (stripping trailing `/api/v1` with or without trailing slash), falling back to relative `/healthz` when unset so local Vite proxy continues to work.
+  - Added unit tests in `frontend/src/App.test.tsx` covering unset env var, configured `VITE_API_BASE_URL`, trailing slash handling, and `BackendStatus` fetch target.
+- **Validation:**
+  - `npm --prefix frontend run lint`: Clean.
+  - `npm --prefix frontend run build`: Clean (`tsc && vite build`).
+  - `npm --prefix frontend test`: Passed.

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from './App';
-import { BackendStatus } from './components/BackendStatus';
+import { BackendStatus, getHealthUrl } from './components/BackendStatus';
 import { formatCentsToUsd } from './lib/formatters';
 
 describe('formatCentsToUsd helper', () => {
@@ -108,7 +108,35 @@ describe('BackendStatus component', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+
+  it('derives health URL from VITE_API_BASE_URL or falls back to /healthz', () => {
+    expect(getHealthUrl(undefined)).toBe('/healthz');
+    expect(getHealthUrl('')).toBe('/healthz');
+    expect(getHealthUrl('   ')).toBe('/healthz');
+    expect(getHealthUrl('https://cardpilot-api-dev.onrender.com/api/v1')).toBe(
+      'https://cardpilot-api-dev.onrender.com/healthz',
+    );
+    expect(getHealthUrl('https://cardpilot-api-dev.onrender.com/api/v1/')).toBe(
+      'https://cardpilot-api-dev.onrender.com/healthz',
+    );
+  });
+
+  it('requests backend /healthz URL when VITE_API_BASE_URL is configured', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://cardpilot-api-dev.onrender.com/api/v1');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ status: 'ok', version: '0.1.0' }),
+    } as Response);
+
+    render(<BackendStatus />);
+
+    await waitFor(() => {
+      expect(screen.getByText('API Connected')).toBeInTheDocument();
+    });
+    expect(fetchSpy).toHaveBeenCalledWith('https://cardpilot-api-dev.onrender.com/healthz');
   });
 
   it('displays API Connected when /healthz returns ok', async () => {

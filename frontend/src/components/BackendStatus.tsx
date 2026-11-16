@@ -8,6 +8,17 @@ interface HealthResponse {
   environment?: string;
 }
 
+export function getHealthUrl(
+  apiBaseUrl: string | undefined = import.meta.env.VITE_API_BASE_URL,
+): string {
+  const trimmed = apiBaseUrl?.trim();
+  if (!trimmed) {
+    return '/healthz';
+  }
+  const baseRoot = trimmed.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+  return `${baseRoot}/healthz`;
+}
+
 export const BackendStatus: React.FC = () => {
   const [state, setState] = useState<ConnectionState>('loading');
   const [details, setDetails] = useState<string>('Checking backend connection...');
@@ -16,7 +27,7 @@ export const BackendStatus: React.FC = () => {
     setState('loading');
     setDetails('Checking backend connection...');
     try {
-      const res = await fetch('/healthz');
+      const res = await fetch(getHealthUrl());
       if (res.ok) {
         const data = (await res.json()) as HealthResponse;
         setState('connected');
