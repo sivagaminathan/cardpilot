@@ -1,7 +1,8 @@
-"""Rule applicability and exclusion evaluation for the reward engine (T10, AC-4).
+"""Rule applicability, exclusion, and per-transaction threshold evaluation (T10, T12, AC-4, AC-7).
 
-Determines whether earning rules match a purchase context by scope (BASE, CATEGORY, MERCHANT)
-and evaluates rule exclusions (category, merchant, merchant_tag) with case/whitespace normalization.
+Determines whether earning rules match a purchase context by scope (BASE, CATEGORY, MERCHANT),
+evaluates rule exclusions (category, merchant, merchant_tag) with case/whitespace normalization,
+and enforces per-transaction minimum spend thresholds (min_transaction_cents).
 Contains no database, network, clock, or I/O side effects.
 """
 
@@ -117,11 +118,41 @@ def _find_matching_exclusion(
     return None, None, None
 
 
+def _format_cents(cents: int) -> str:
+    """Format integer cents as dollars and cents without floating-point arithmetic."""
+    dollars, rem = divmod(cents, 100)
+    return f"${dollars}.{rem:02d} ({cents} cents)"
+
+
+def _check_min_transaction_threshold(
+    rule: EarningRule,
+    purchase: Purchase,
+) -> tuple[bool, str | None, str | None]:
+    """Check if purchase meets the rule's per-transaction minimum threshold.
+
+    Returns:
+        (passes, rejection_reason, rejection_detail)
+    """
+    if rule.min_transaction_cents is None:
+        return True, None, None
+
+    if purchase.amount_cents >= rule.min_transaction_cents:
+        return True, None, None
+
+    return (
+        False,
+        "below_min_transaction",
+        f"Purchase amount {_format_cents(purchase.amount_cents)} is below rule "
+        f"minimum transaction threshold of {_format_cents(rule.min_transaction_cents)}.",
+    )
+
+
 def check_rule_applicability(rule: EarningRule, purchase: Purchase) -> ApplicabilityResult:
     """Evaluate whether a rule applies to a purchase context.
 
-    Scope matching is checked first. If scope matches, exclusions are evaluated in order.
-    Returns ApplicabilityResult with stable rejection reason and detail on rejection.
+    Scope matching is checked first, followed by exclusions in order, and then
+    the per-transaction minimum threshold. Returns ApplicabilityResult with stable
+    rejection reason and detail on rejection.
     """
     scope_matches, scope_reason, scope_detail = _matches_scope(rule, purchase)
     if not scope_matches:
@@ -138,6 +169,14 @@ def check_rule_applicability(rule: EarningRule, purchase: Purchase) -> Applicabi
             rejection_reason=ex_reason,
             rejection_detail=ex_detail,
             matched_exclusion=matched_ex,
+        )
+
+    meets_min, min_reason, min_detail = _check_min_transaction_threshold(rule, purchase)
+    if not meets_min:
+        return ApplicabilityResult(
+            is_applicable=False,
+            rejection_reason=min_reason,
+            rejection_detail=min_detail,
         )
 
     return ApplicabilityResult(is_applicable=True)

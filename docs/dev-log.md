@@ -360,3 +360,37 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `uv run --directory backend --extra dev ruff format --check .`: 33 files already formatted.
 - **Acceptance Criteria [Done when]:**
   - Selection by specificity -> priority -> id and tie determinism implemented and verified against AC-3 and AC-13. Satisfied.
+
+
+### Task T12: Per-Transaction Minimum Threshold (AC-7)
+- **Date:** 2026-11-16
+- **Branch:** `main`
+- **Scope:** Implement per-transaction minimum spend threshold (`min_transaction_cents`) enforcement in the applicability filter per SPEC AC-7, FR-11, and ARCHITECTURE §4.2 step 2.
+- **Implementation Details:**
+  - Updated `backend/app/engine/applicability.py`:
+    - Added `_format_cents(cents)` using pure integer `divmod` (no floats) for clear threshold/amount explanations.
+    - Added `_check_min_transaction_threshold(rule, purchase)`: passes when `min_transaction_cents is None` or `purchase.amount_cents >= rule.min_transaction_cents`; rejects with `below_min_transaction` when `purchase.amount_cents < rule.min_transaction_cents`.
+    - Integrated threshold check into `check_rule_applicability(rule, purchase)` after scope matching and exclusion evaluation, preserving existing public signatures and T10 behavior.
+    - `filter_applicable_rules` emits `TraceStep(step_type="applicability_filter", action="rejected", reason="below_min_transaction", ...)` with rule ID/key and deterministic step numbering, allowing eligible fallback rules to win via T11 `select_best_rule`.
+  - Added 8 unit tests in `backend/tests/engine/test_applicability.py` (`TestMinTransactionThreshold`):
+    - `min_transaction_cents=None` passes for small purchases.
+    - Purchase below minimum rejected with `below_min_transaction` (including `$20.00` / `$25.00` formatting).
+    - Dollar formatting edge cases (`1` -> `$0.01`, `99` -> `$0.99`, `100` -> `$1.00`, `10025` -> `$100.25`).
+    - Purchase exactly at minimum passes (inclusive boundary).
+    - Purchase above minimum passes.
+    - Scope mismatch and exclusion checks take precedence over threshold failure.
+    - AC-7 end-to-end with T11: $25 minimum promo rule rejected on $20 purchase while fallback base rule survives and wins `select_best_rule`.
+    - Multiple rules with mixed threshold outcomes preserve surviving rule order and deterministic rejection trace numbering.
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Approved integrating `min_transaction_cents` into `applicability.py`, inclusive `>=` boundary, and `below_min_transaction` rejection reason.
+  - **AI Executed:** Followed test-first TDD, implemented pure integer-cents threshold check, verified all tests and static checks.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/engine/test_applicability.py`: 23 passed in 0.16s.
+  - `uv run --directory backend --extra dev pytest`: 79 passed in 0.46s (full backend suite, including `test_no_float.py`).
+  - `uv run --directory backend --extra dev mypy --strict app/engine`: Success: no issues found in 5 source files.
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 18 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 33 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Per-transaction minimum threshold (`min_transaction_cents`) implemented and verified against AC-7. Satisfied.

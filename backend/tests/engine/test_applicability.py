@@ -13,6 +13,7 @@ from app.engine.applicability import (
     check_rule_applicability,
     filter_applicable_rules,
 )
+from app.engine.selection import select_best_rule
 from app.engine.types import (
     EarningRule,
     ExclusionType,
@@ -30,6 +31,8 @@ def _make_rule(
     merchant: str | None = None,
     exclusions: tuple[RuleExclusion, ...] = (),
     multiplier: str = "1.0",
+    priority: int = 0,
+    min_transaction_cents: int | None = None,
 ) -> EarningRule:
     """Helper to construct an EarningRule for applicability testing."""
     return EarningRule(
@@ -41,6 +44,8 @@ def _make_rule(
         effective_from=date(2026, 1, 1),
         category=category,
         merchant=merchant,
+        priority=priority,
+        min_transaction_cents=min_transaction_cents,
         exclusions=exclusions,
     )
 
@@ -395,3 +400,210 @@ class TestBatchFilterApplicableRules:
         app_empty, traces_empty = filter_applicable_rules((), p)
         assert app_empty == ()
         assert traces_empty == ()
+
+
+class TestMinTransactionThreshold:
+    """Tests for per-transaction minimum threshold enforcement (T12, AC-7)."""
+
+    def test_no_threshold_passes_for_small_purchase(self) -> None:
+        rule = _make_rule(
+            id=20,
+            rule_key="dining.no_min",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_transaction_cents=None,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=1)
+
+        res = check_rule_applicability(rule, purchase)
+
+        assert res.is_applicable is True
+        assert res.rejection_reason is None
+        assert res.rejection_detail is None
+
+    def test_below_minimum_threshold_rejected(self) -> None:
+        rule = _make_rule(
+            id=21,
+            rule_key="dining.min25",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_transaction_cents=2500,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=2000)
+
+        res = check_rule_applicability(rule, purchase)
+
+        assert res.is_applicable is False
+        assert res.rejection_reason == "below_min_transaction"
+        assert res.matched_exclusion is None
+        assert res.rejection_detail is not None
+        assert "$20.00" in res.rejection_detail
+        assert "$25.00" in res.rejection_detail
+        assert "2000" in res.rejection_detail
+        assert "2500" in res.rejection_detail
+
+    def test_threshold_rejection_detail_formats_dollars_accurately(self) -> None:
+        cases = (
+            (1, 100, "$0.01", "$1.00"),
+            (99, 10025, "$0.99", "$100.25"),
+        )
+        for purchase_cents, min_cents, expected_purchase, expected_min in cases:
+            rule = _make_rule(
+                id=25,
+                rule_key="dining.format_check",
+                scope_type=ScopeType.CATEGORY,
+                category="dining",
+                min_transaction_cents=min_cents,
+            )
+            purchase = _make_purchase(category="dining", amount_cents=purchase_cents)
+
+            res = check_rule_applicability(rule, purchase)
+
+            assert res.is_applicable is False
+            assert res.rejection_reason == "below_min_transaction"
+            assert res.rejection_detail is not None
+            assert expected_purchase in res.rejection_detail
+            assert expected_min in res.rejection_detail
+
+    def test_exact_minimum_threshold_passes(self) -> None:
+        rule = _make_rule(
+            id=22,
+            rule_key="dining.min25",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_transaction_cents=2500,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=2500)
+
+        res = check_rule_applicability(rule, purchase)
+
+        assert res.is_applicable is True
+        assert res.rejection_reason is None
+
+    def test_above_minimum_threshold_passes(self) -> None:
+        rule = _make_rule(
+            id=23,
+            rule_key="dining.min25",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_transaction_cents=2500,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=2501)
+
+        res = check_rule_applicability(rule, purchase)
+
+        assert res.is_applicable is True
+        assert res.rejection_reason is None
+
+    def test_scope_and_exclusion_precede_threshold_check(self) -> None:
+        exclusion = RuleExclusion(
+            exclusion_type=ExclusionType.MERCHANT_TAG,
+            target="fast_food",
+            reason="Fast food excluded",
+        )
+        rule = _make_rule(
+            id=24,
+            rule_key="dining.min25.ex",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_transaction_cents=2500,
+            exclusions=(exclusion,),
+        )
+
+        # Scope mismatch takes precedence over threshold failure
+        mismatch_res = check_rule_applicability(
+            rule, _make_purchase(category="groceries", amount_cents=1000)
+        )
+        assert mismatch_res.is_applicable is False
+        assert mismatch_res.rejection_reason == "category_mismatch"
+
+        # Exclusion takes precedence over threshold failure
+        excluded_res = check_rule_applicability(
+            rule,
+            _make_purchase(category="dining", merchant_tags=("fast_food",), amount_cents=1000),
+        )
+        assert excluded_res.is_applicable is False
+        assert excluded_res.rejection_reason == "merchant_tag_exclusion"
+
+    def test_ac7_threshold_rejection_allows_fallback_rule_to_win_selection(self) -> None:
+        """AC-7: $25 min rule is rejected for $20 purchase; fallback rule wins via T11."""
+        promo_rule = _make_rule(
+            id=101,
+            rule_key="dining.promo_5x",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            multiplier="5.0",
+            priority=10,
+            min_transaction_cents=2500,
+        )
+        fallback_rule = _make_rule(
+            id=102,
+            rule_key="base.1x",
+            scope_type=ScopeType.BASE,
+            multiplier="1.0",
+            priority=0,
+            min_transaction_cents=None,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=2000)
+
+        applicable, rejection_traces = filter_applicable_rules(
+            (promo_rule, fallback_rule), purchase
+        )
+
+        assert applicable == (fallback_rule,)
+        assert len(rejection_traces) == 1
+        trace = rejection_traces[0]
+        assert trace.step_number == 1
+        assert trace.step_type == "applicability_filter"
+        assert trace.action == "rejected"
+        assert trace.rule_id == 101
+        assert trace.rule_key == "dining.promo_5x"
+        assert trace.reason == "below_min_transaction"
+        assert "2000" in trace.detail
+        assert "2500" in trace.detail
+
+        selection = select_best_rule(applicable)
+        assert selection is not None
+        assert selection.winning_rule == fallback_rule
+        assert selection.alternative_rules == ()
+
+    def test_multiple_rules_mixed_threshold_outcomes_deterministic_traces(self) -> None:
+        r_high_min = _make_rule(
+            id=1,
+            rule_key="dining.min50",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_transaction_cents=5000,
+        )
+        r_exact_min = _make_rule(
+            id=2,
+            rule_key="dining.min20",
+            scope_type=ScopeType.CATEGORY,
+            category="dining",
+            min_transaction_cents=2000,
+        )
+        r_mid_min = _make_rule(
+            id=3,
+            rule_key="base.min30",
+            scope_type=ScopeType.BASE,
+            min_transaction_cents=3000,
+        )
+        r_no_min = _make_rule(
+            id=4,
+            rule_key="base.no_min",
+            scope_type=ScopeType.BASE,
+            min_transaction_cents=None,
+        )
+        purchase = _make_purchase(category="dining", amount_cents=2000)
+
+        applicable, rejection_traces = filter_applicable_rules(
+            (r_high_min, r_exact_min, r_mid_min, r_no_min), purchase
+        )
+
+        assert applicable == (r_exact_min, r_no_min)
+        assert [t.step_number for t in rejection_traces] == [1, 2]
+        assert [t.rule_id for t in rejection_traces] == [1, 3]
+        assert [t.reason for t in rejection_traces] == [
+            "below_min_transaction",
+            "below_min_transaction",
+        ]
