@@ -672,3 +672,28 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `git diff --check`: Clean (0 whitespace/formatting errors).
 - **Acceptance Criteria [Done when]:**
   - Rules, exclusions, and caps ORM models, `btree_gist` non-overlap constraint, immutability boundary, and reversible Alembic migration implemented and verified against real PostgreSQL. Satisfied.
+
+## T23 — Migrations & ORM for profiles, valuations, transactions, calcs, and benefits (2026-11-16)
+- **What was done:**
+  - Implemented SQLAlchemy 2.0 ORM models in `backend/app/models/profiles.py` and re-exported them in `backend/app/models/__init__.py`:
+    - `Profile` (`profiles`): `slug` (unique, indexed), `display_name`, `is_demo`, nullable unique `seed_key`.
+    - `ProfileCard` (`profile_cards`): FKs to `profiles.id` (`CASCADE`) and `card_products.id` (`RESTRICT`), `nickname`, `opened_on`, `is_active`.
+    - `CurrencyValuation` (`currency_valuations`): composite PK `(profile_id, reward_currency_id)`, `Numeric(8, 4)` `cents_per_unit > 0`, `is_user_set`, UTC `updated_at`.
+    - `Transaction` (`transactions`): FKs to `profiles.id` (`CASCADE`), `profile_cards.id` (`CASCADE`), `categories.id` (`RESTRICT`), nullable `merchants.id` (`RESTRICT`), `amount_cents > 0`, `merchant_text`, `occurred_on`, `note`, UTC `created_at`, and composite indexes `(profile_id, occurred_on)` and `(profile_card_id, occurred_on)`.
+    - `TransactionRewardCalc` (`transaction_reward_calcs`): unique `transaction_id` FK (`CASCADE`), `engine_version`, `reward_currency_id` FK (`RESTRICT`), `Numeric(14, 4)` `reward_units >= 0`, nullable `valuation_cents_per_unit_used > 0`, nullable `estimated_value_cents >= 0`, `JSONB` `trace`, UTC `created_at`.
+    - `CalcRuleReference` (`calc_rule_references`): composite PK `(calc_id, rule_id)`, `calc_id` FK (`CASCADE`), indexed `rule_id` FK (`RESTRICT`).
+    - `BenefitDefinition` (`benefit_definitions`): `card_product_id` FK (`RESTRICT`), `benefit_type` (`credit | allowance | perk`), nullable `value_cents > 0`, `reset_period` (`monthly | quarterly | semiannual | calendar_year | card_year`), `notes`, `source_id` FK (`RESTRICT`), `effective_to >= effective_from`.
+    - `BenefitUsage` (`benefit_usages`): `profile_card_id` FK (`CASCADE`), `benefit_definition_id` FK (`RESTRICT`), nullable `amount_cents > 0`, `used_on`, `note`, and composite index `(profile_card_id, benefit_definition_id, used_on)`.
+    - Immutability integration: `is_rule_referenced(session, rule_id)` (using `no_autoflush`) and `check_rule_mutable(session, rule)` wired to `ensure_rule_mutable()`, plus PostgreSQL `BEFORE UPDATE` trigger `trg_earning_rules_immutable_when_referenced` on `earning_rules` blocking direct SQL semantic updates to referenced rules.
+  - Added reversible Alembic migration `backend/alembic/versions/460ae59a41d3_add_profiles_transactions_calcs_and_.py` depending on `1f98842cde08`.
+  - Added real-PostgreSQL integration tests in `backend/tests/db/test_profile_calc_models.py`.
+- **Verification & Testing (Actual Results):**
+  - `alembic upgrade head` -> `alembic downgrade 1f98842cde08` -> `alembic upgrade head`: succeeded cleanly against PostgreSQL 16.
+  - `uv run --directory backend --extra dev pytest tests/db/test_profile_calc_models.py`: 6 passed in 1.98s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 247 passed in 7.98s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 28 source files.
+  - `uv run --directory backend --extra dev ruff check .`: All checks passed.
+  - `uv run --directory backend --extra dev ruff format --check .`: 56 files already formatted.
+  - `git diff --check`: Clean (0 whitespace/formatting errors).
+- **Acceptance Criteria [Done when]:**
+  - Profiles, cards, valuations, transactions, calculation snapshots, rule references, benefits, usages, DB/ORM immutability guard, and reversible Alembic migration implemented and verified against real PostgreSQL. Satisfied.
