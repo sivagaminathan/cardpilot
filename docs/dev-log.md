@@ -126,3 +126,36 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
 - **Blockers & Outstanding Acceptance Criteria:**
   - **Docker Desktop Status:** Docker daemon is currently not running on the host machine.
   - **Acceptance Criteria [Done when]:** `docker compose up` serves web, which calls `/healthz` successfully. Container build and runtime execution require Docker Desktop to be started; runtime verification remains pending daemon availability.
+
+### Task T05: SQLAlchemy + Alembic Wired to Postgres & /readyz Endpoint
+- **Date:** 2026-11-15
+- **Branch:** `main`
+- **Scope:** SQLAlchemy 2.0 + asyncpg setup, Alembic async migrations, initial empty migration, and `GET /readyz` readiness probe.
+- **Implementation Details:**
+  - `backend/pyproject.toml`: Added `sqlalchemy[asyncio]>=2.0.0`, `alembic>=1.13.0`, and `asyncpg>=0.29.0` dependencies. Installed `greenlet` runtime dependency for async engine support.
+  - `backend/app/db.py`: Implemented SQLAlchemy 2.0 `DeclarativeBase` (`Base`), async engine factory (`get_engine`), async sessionmaker (`get_session_maker`), `get_db_session` FastAPI dependency, `check_db_health` query verification helper (`SELECT 1`), and `close_engine` cleanup handler.
+  - `backend/app/api/deps.py`: Exported `get_db_session` dependency for FastAPI routes.
+  - `backend/app/main.py`: Registered unversioned `GET /readyz` endpoint returning HTTP 200 with `{"status": "ready", "database": "connected"}` when PostgreSQL is reachable, and raising HTTP 503 RFC 9457 Problem Details when unreachable. Updated lifespan context manager to dispose of database connection pools on shutdown.
+  - `backend/alembic.ini` & `backend/alembic/`: Initialized Alembic with async template. Updated `env.py` to source `database_url` from settings/environment and attach `target_metadata = Base.metadata`.
+  - `backend/alembic/versions/f5f1d05a3578_initial_empty_migration.py`: Generated empty initial migration revision.
+  - `backend/Dockerfile` & `backend/pyproject.toml`: Updated container build definition to include `alembic.ini` and `alembic/` in `/app`, and configured `tool.setuptools.packages.find` to explicitly discover `app*` avoiding flat-layout directory conflicts during container builds.
+  - `backend/tests/api/test_readiness.py`: Added automated test suite testing `/readyz` against real PostgreSQL (status 200) and simulating database failure via dependency override (status 503 Problem Details).
+- **Human Decisions vs. AI Work:**
+  - **Human Decided:** Directed implementation of T05 following completion and verification of T04. Enforced AGENTS.md test-first rules and strict review boundaries.
+  - **AI Executed:** Authored database abstraction, Alembic configuration, initial migration, `/readyz` route, and tests; executed migrations and test suite against real PostgreSQL.
+- **Verification & Testing (Actual Results):**
+  - `python -m alembic upgrade head`: Applied `f5f1d05a3578` (initial empty migration) to Postgres cleanly (`Context impl PostgresqlImpl. Running upgrade -> f5f1d05a3578`).
+  - `python -m alembic current`: Verified `f5f1d05a3578 (head)` recorded in `alembic_version` table in PostgreSQL.
+  - Container verification (`docker compose exec api`):
+    - `python -m alembic current`: Verified `f5f1d05a3578 (head)`.
+    - `python -m alembic upgrade head`: Successfully executed in container.
+    - `python -m alembic current`: Verified `f5f1d05a3578 (head)`.
+    - `GET http://localhost:8000/readyz`: Returns `{"status":"ready","database":"connected"}` from live API container.
+  - `python -m pytest backend`: 6 passed in 0.33s (`test_health.py` [4], `test_readiness.py` [2]).
+  - `python -m ruff check backend`: All checks passed (0 errors).
+  - `python -m ruff format --check backend`: 24 source files already formatted.
+  - `python -m mypy backend`: Success: no issues found in 23 source files.
+  - `npm test -- --run` (in `frontend/`): 9 passed in 4.71s (0 warnings).
+  - `npm run lint` (in `frontend/`): Passed (0 errors, 0 warnings).
+- **Acceptance Criteria [Done when]:**
+  - `alembic upgrade head` on empty DB works; readiness test passes against real Postgres. Satisfied.

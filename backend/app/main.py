@@ -2,15 +2,19 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.deps import get_db_session
 from app.api.errors import http_exception_handler, validation_exception_handler
 from app.api.routes import api_router
 from app.config import Settings, get_settings
+from app.db import check_db_health, close_engine
 
 
 @asynccontextmanager
@@ -19,6 +23,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup tasks
     yield
     # Shutdown tasks
+    await close_engine()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -58,6 +63,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "version": app_settings.app_version,
             "environment": app_settings.environment,
         }
+
+    # Unversioned readiness check endpoint
+    @app.get("/readyz", tags=["meta"], summary="Readiness probe")
+    async def readyz(
+        session: Annotated[AsyncSession, Depends(get_db_session)],
+    ) -> dict[str, str]:
+        """Readiness health check endpoint verifying database connectivity."""
+        try:
+            is_healthy = await check_db_health(session)
+            if not is_healthy:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Database readiness check returned unhealthy status",
+                )
+            return {
+                "status": "ready",
+                "database": "connected",
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Database unreachable: {exc}",
+            ) from exc
 
     # Mount versioned API routes
     app.include_router(api_router)

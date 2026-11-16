@@ -8,8 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency spec and package files
-COPY pyproject.toml README.md ./
+# Copy dependency spec, migration config, and package files
+COPY pyproject.toml README.md alembic.ini ./
+COPY alembic/ ./alembic/
 COPY app/ ./app/
 
 # Install application and dependencies in editable mode for dev hot-reloading
