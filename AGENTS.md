@@ -95,3 +95,24 @@ make e2e        # Playwright
 - **Rule version**: immutable row for a rule_key with effective dates; superseded by a newer version.
 - **Snapshot**: stored calculation result + trace for a transaction.
 - **Unranked**: eligible card that can't be compared in dollars because no valuation exists.
+
+
+**Git workflow update:**
+
+For this project, work directly on the main branch. Do not create feature branches unless I explicitly request them.
+
+After completing each backlog task:
+
+1. Run relevant tests, linting and type checks.
+2. Review git diff and git status.
+3. Ensure no secrets, environment files or generated artifacts are accidentally included.
+4. Stage only the files relevant to the completed task.
+5. Use professional Conventional Commit messages.
+6. Commit the completed task to main.
+7. Push the commit to origin/main.
+
+Do not commit or push automatically without first presenting the proposed changes, test results and commit message for my approval.
+
+Never force-push, rewrite Git history, or discard existing work.
+
+Use the appropriate commit prefix: feat, fix, test, docs, refactor, build, ci or chore.
