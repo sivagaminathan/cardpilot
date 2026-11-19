@@ -16,6 +16,15 @@ class ProfileSummary(BaseModel):
     is_demo: bool
 
 
+class ProfileResetResponse(BaseModel):
+    """Response returned after resetting a demo profile to its seeded baseline."""
+
+    status: str = "reset"
+    profile: ProfileSummary
+    cards_restored: int
+    valuations_restored: int
+
+
 class CategorySummary(BaseModel):
     """Spending category metadata."""
 

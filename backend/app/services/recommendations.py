@@ -57,11 +57,12 @@ from app.schemas.recommendations import (
     AppliedPortionSchema,
     CardRecommendationItem,
     CategorySummary,
+    ProfileResetResponse,
     ProfileSummary,
     RecommendationRequest,
     RecommendationResponse,
 )
-from app.seeds.loader import ensure_seeded
+from app.seeds.loader import ensure_seeded, reset_profile_to_seed
 
 _logger = logging.getLogger("cardpilot.recommendations")
 _tracer = otel_trace.get_tracer("cardpilot.recommendations")
@@ -93,6 +94,47 @@ async def list_categories(session: AsyncSession) -> list[CategorySummary]:
     await session.commit()
     rows = (await session.scalars(select(Category).order_by(Category.id))).all()
     return [CategorySummary(id=c.id, code=c.code, name=c.name) for c in rows]
+
+
+async def reset_profile(session: AsyncSession, profile_key: str) -> ProfileResetResponse:
+    """Reset a demo profile to its original seeded state inside a single transaction."""
+    await ensure_seeded(session)
+    if profile_key.isdigit():
+        profile = await session.scalar(select(Profile).where(Profile.id == int(profile_key)))
+    else:
+        profile = await session.scalar(select(Profile).where(Profile.slug == profile_key))
+
+    if profile is None:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Profile '{profile_key}' not found.",
+        )
+
+    try:
+        cards_restored, valuations_restored = await reset_profile_to_seed(session, profile)
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception:
+        await session.rollback()
+        raise
+
+    return ProfileResetResponse(
+        status="reset",
+        profile=ProfileSummary(
+            id=profile.id,
+            slug=profile.slug,
+            display_name=profile.display_name,
+            is_demo=profile.is_demo,
+        ),
+        cards_restored=cards_restored,
+        valuations_restored=valuations_restored,
+    )
 
 
 def _to_engine_rule(db_rule: DbRule) -> EngineRule:

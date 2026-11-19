@@ -11,6 +11,7 @@ from app.api.deps import get_db_session
 from app.config import Settings, get_settings
 from app.schemas.recommendations import (
     CategorySummary,
+    ProfileResetResponse,
     ProfileSummary,
     RecommendationRequest,
     RecommendationResponse,
@@ -19,6 +20,7 @@ from app.services.recommendations import (
     list_categories,
     list_profiles,
     recommend_for_profile,
+    reset_profile,
 )
 
 router = APIRouter(tags=["recommendations"])
@@ -38,6 +40,15 @@ async def get_categories(
 ) -> list[CategorySummary]:
     """List spending categories."""
     return await list_categories(session)
+
+
+@router.post("/profiles/{profile_key}/reset", response_model=ProfileResetResponse)
+async def post_profile_reset(
+    profile_key: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> ProfileResetResponse:
+    """Reset a demo profile and its associated state back to seeded defaults."""
+    return await reset_profile(session, profile_key)
 
 
 @router.post("/profiles/{profile_key}/recommendations", response_model=RecommendationResponse)

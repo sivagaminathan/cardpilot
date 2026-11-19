@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from sqlalchemy import exists, select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import close_engine, get_session_maker
@@ -26,6 +26,7 @@ from app.models import (
     RuleExclusion,
     RuleSource,
     SpendCap,
+    Transaction,
     check_rule_mutable,
     is_rule_referenced,
 )
@@ -384,6 +385,67 @@ async def ensure_seeded(session: AsyncSession) -> None:
     has_profiles = await session.scalar(select(exists().select_from(Profile)))
     if not has_profiles:
         await seed_all(session)
+
+
+async def reset_profile_to_seed(session: AsyncSession, profile: Profile) -> tuple[int, int]:
+    """Reset a single demo profile's cards, valuations, transactions, and usages to seed state."""
+    if not profile.is_demo or not profile.seed_key:
+        raise ValueError(f"Profile '{profile.slug}' is not a resettable demo profile.")
+
+    profiles_doc = _load_yaml("profiles.yaml")["profiles"]
+    seed_cfg = next((p for p in profiles_doc if p.get("seed_key") == profile.seed_key), None)
+    if seed_cfg is None:
+        raise ValueError(f"No seed definition found for profile '{profile.slug}'.")
+
+    await session.execute(delete(Transaction).where(Transaction.profile_id == profile.id))
+    await session.execute(
+        delete(CurrencyValuation).where(CurrencyValuation.profile_id == profile.id)
+    )
+    await session.execute(delete(ProfileCard).where(ProfileCard.profile_id == profile.id))
+    await session.flush()
+
+    profile.slug = seed_cfg["slug"]
+    profile.display_name = seed_cfg["display_name"]
+    profile.is_demo = bool(seed_cfg.get("is_demo", True))
+
+    all_products = (await session.scalars(select(CardProduct))).all()
+    products_by_key = {(p.issuer_name, p.name): p for p in all_products}
+    all_currencies = (await session.scalars(select(RewardCurrency))).all()
+    currencies_by_code = {c.code: c for c in all_currencies}
+
+    cards_restored = 0
+    for card_cfg in seed_cfg.get("cards", []):
+        pkey = (
+            card_cfg["card_product"]["issuer_name"],
+            card_cfg["card_product"]["name"],
+        )
+        card_prod = products_by_key[pkey]
+        session.add(
+            ProfileCard(
+                profile_id=profile.id,
+                card_product_id=card_prod.id,
+                nickname=card_cfg["nickname"],
+                opened_on=_opt_date(card_cfg.get("opened_on")),
+                is_active=True,
+            )
+        )
+        cards_restored += 1
+
+    valuations_restored = 0
+    for val_cfg in seed_cfg.get("valuations", []):
+        curr = currencies_by_code[val_cfg["reward_currency_code"]]
+        session.add(
+            CurrencyValuation(
+                profile_id=profile.id,
+                reward_currency_id=curr.id,
+                cents_per_unit=Decimal(str(val_cfg["cents_per_unit"])),
+                is_user_set=bool(val_cfg.get("is_user_set", False)),
+            )
+        )
+        valuations_restored += 1
+
+    await session.flush()
+    return cards_restored, valuations_restored
 
 
 async def _main() -> None:
