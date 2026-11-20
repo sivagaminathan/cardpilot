@@ -70,7 +70,10 @@ from app.engine.valuation import (
     evaluate_valuation,
 )
 
+ENGINE_VERSION = "1.0.0"
+
 __all__ = [
+    "ENGINE_VERSION",
     "GLOBAL_COMPARISON_NOTE",
     "NO_RANKABLE_CARDS_NOTE",
     "ApplicabilityResult",

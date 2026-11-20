@@ -220,14 +220,17 @@ async def assemble_profile_engine_inputs(
     purchase_date: date,
     *,
     card_ids: Sequence[int] | None = None,
+    include_inactive: bool = False,
 ) -> list[AssembledCardInput]:
-    """Load active cards, rules, caps, spend history, and valuations for a profile."""
+    """Load profile cards, rules, caps, spend history, and valuations for a profile."""
     card_stmt = (
         select(ProfileCard)
-        .where(ProfileCard.profile_id == profile_id, ProfileCard.is_active.is_(True))
+        .where(ProfileCard.profile_id == profile_id)
         .options(selectinload(ProfileCard.card_product).selectinload(CardProduct.reward_currency))
         .order_by(ProfileCard.id)
     )
+    if not include_inactive:
+        card_stmt = card_stmt.where(ProfileCard.is_active.is_(True))
     if card_ids is not None:
         card_stmt = card_stmt.where(ProfileCard.id.in_(list(card_ids)))
 

@@ -51,7 +51,7 @@ Conventions
 - [x] **T28** Service layer: assemble engine inputs from DB (rules, caps, spend history). *Done when:* integration test matches engine fixtures through the DB.
 - [x] **T29** `POST /recommendations` endpoint + tests (all key ACs through HTTP). [AC-2…AC-7, AC-9, AC-13]
 - [x] **T30** Sensitive-data guard (13–19 digit sequences) shared validator. [AC-12]
-- [ ] **T31** Transactions endpoints with snapshot persistence. [AC-8]
+- [x] **T31** Transactions endpoints with snapshot persistence. [AC-8]
 - [ ] **T32** History-preservation test: load rule v2, assert old snapshot unchanged, new calc differs. [AC-8]
 - [ ] **T33** Benefits: period math + status + usage endpoints. [AC-11]
 - [ ] **T34** Rewards summary endpoint (per-currency units; separate estimated USD). [AC-10]

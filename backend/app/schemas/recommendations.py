@@ -6,6 +6,8 @@ from datetime import date
 
 from pydantic import BaseModel, Field, StrictInt, field_validator
 
+from app.engine import ENGINE_VERSION
+
 
 class ProfileSummary(BaseModel):
     """Public summary of a demo or user profile."""
@@ -94,4 +96,4 @@ class RecommendationResponse(BaseModel):
     unranked: list[CardRecommendationItem]
     ineligible: list[CardRecommendationItem]
     global_notes: list[str]
-    engine_version: str = "1.0.0"
+    engine_version: str = ENGINE_VERSION
