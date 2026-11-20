@@ -7,6 +7,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.validators import SafeFreeText
+
 
 class RewardCurrencySummary(BaseModel):
     """Reward currency metadata."""
@@ -125,7 +127,7 @@ class ProfileCardCreate(BaseModel):
     """Request payload to add a catalog card to a profile."""
 
     card_product_id: int = Field(..., gt=0)
-    nickname: str = Field(..., min_length=1, max_length=128)
+    nickname: SafeFreeText = Field(..., min_length=1, max_length=128)
     opened_on: date | None = None
     is_active: bool = True
 
@@ -133,7 +135,7 @@ class ProfileCardCreate(BaseModel):
 class ProfileCardUpdate(BaseModel):
     """Request payload to update a profile card's nickname, opened date, or active status."""
 
-    nickname: str | None = Field(default=None, min_length=1, max_length=128)
+    nickname: SafeFreeText | None = Field(default=None, min_length=1, max_length=128)
     opened_on: date | None = None
     is_active: bool | None = None
 

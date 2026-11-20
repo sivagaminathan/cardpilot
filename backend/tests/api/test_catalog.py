@@ -245,3 +245,78 @@ def test_unrelated_integrity_error_not_treated_as_duplicate() -> None:
     """Unrelated IntegrityError (e.g. FK/CHECK violation) is not misclassified as duplicate."""
     unrelated = IntegrityError("INSERT ...", {}, Exception("ck_profile_cards_other"))
     assert catalog_service._is_duplicate_profile_card_error(unrelated) is False
+
+
+@pytest.mark.asyncio
+async def test_profile_card_sensitive_digit_guard_rejects_422_and_allows_20_digits(
+    async_client: AsyncClient,
+) -> None:
+    """POST/PATCH reject 13-19 digit nicknames with 422 Problem Details; 20-digit is allowed."""
+    await _ensure_seeded()
+    products = (await async_client.get("/api/v1/card-products")).json()
+    product_id = products[0]["id"]
+
+    maya_cards_before = (await async_client.get("/api/v1/profiles/maya/cards")).json()
+    existing_card = maya_cards_before[0]
+
+    for bad_nickname in ("4111111111111111", "4111 1111-1111 1111"):
+        post_res = await async_client.post(
+            "/api/v1/profiles/maya/cards",
+            json={"card_product_id": product_id, "nickname": bad_nickname},
+        )
+        assert post_res.status_code == 422
+        assert post_res.headers["content-type"].startswith("application/problem+json")
+        assert bad_nickname not in post_res.text
+
+        patch_res = await async_client.patch(
+            f"/api/v1/profiles/maya/cards/{existing_card['id']}",
+            json={"nickname": bad_nickname},
+        )
+        assert patch_res.status_code == 422
+        assert patch_res.headers["content-type"].startswith("application/problem+json")
+        assert bad_nickname not in patch_res.text
+
+    maya_cards_after = (await async_client.get("/api/v1/profiles/maya/cards")).json()
+    assert maya_cards_after == maya_cards_before
+
+    try:
+        ok_20 = await async_client.post(
+            "/api/v1/profiles/maya/cards",
+            json={"card_product_id": product_id, "nickname": "Ref 12345678901234567890"},
+        )
+        assert ok_20.status_code == 201
+    finally:
+        await async_client.post("/api/v1/profiles/maya/reset")
+
+
+@pytest.mark.asyncio
+async def test_profile_card_sensitive_digit_guard_rejects_422_and_stores_nothing(
+    async_client: AsyncClient,
+) -> None:
+    """POST and PATCH reject 13-19 digit nicknames with 422 Problem Details and persist nothing."""
+    await _ensure_seeded()
+    products = (await async_client.get("/api/v1/card-products")).json()
+    product_id = products[0]["id"]
+
+    maya_cards_before = (await async_client.get("/api/v1/profiles/maya/cards")).json()
+    existing_card = maya_cards_before[0]
+
+    for bad_nickname in ("4111111111111111", "4111 1111-1111 1111"):
+        post_res = await async_client.post(
+            "/api/v1/profiles/maya/cards",
+            json={"card_product_id": product_id, "nickname": bad_nickname},
+        )
+        assert post_res.status_code == 422
+        assert post_res.headers["content-type"].startswith("application/problem+json")
+        assert bad_nickname not in post_res.text
+
+        patch_res = await async_client.patch(
+            f"/api/v1/profiles/maya/cards/{existing_card['id']}",
+            json={"nickname": bad_nickname},
+        )
+        assert patch_res.status_code == 422
+        assert patch_res.headers["content-type"].startswith("application/problem+json")
+        assert bad_nickname not in patch_res.text
+
+    maya_cards_after = (await async_client.get("/api/v1/profiles/maya/cards")).json()
+    assert maya_cards_after == maya_cards_before
