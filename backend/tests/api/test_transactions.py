@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from datetime import date
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app.db import close_engine, get_session_maker
 from app.engine import ENGINE_VERSION
-from app.models import CalcRuleReference, Transaction, TransactionRewardCalc
+from app.models import (
+    CalcRuleReference,
+    Category,
+    EarningRule,
+    RuleSource,
+    Transaction,
+    TransactionRewardCalc,
+)
 from app.seeds.loader import seed_all
 
 
@@ -551,3 +560,219 @@ async def test_transaction_validation_errors_sensitive_guard_and_duplicates(
     finally:
         await async_client.post("/api/v1/profiles/maya/reset")
         await async_client.post("/api/v1/profiles/dev/reset")
+
+
+@pytest.mark.asyncio
+async def test_history_preservation_when_rule_v2_loaded_ac8(
+    async_client: AsyncClient,
+) -> None:
+    """AC-8 / T32: loading rule v2 leaves v1 snapshot unchanged and new calc uses v2."""
+    await _ensure_seeded()
+    await async_client.post("/api/v1/profiles/maya/reset")
+
+    rule_key = f"t32.travel.{uuid4().hex[:8]}"
+    rule_v1_id: int | None = None
+    rule_v2_id: int | None = None
+    session_factory = get_session_maker()
+
+    try:
+        cards = (await async_client.get("/api/v1/profiles/maya/cards")).json()
+        target_card = next(
+            c for c in cards if c["card_product"]["name"] == "Northwind Cash Everyday"
+        )
+        card_id = target_card["id"]
+        card_product_id = target_card["card_product"]["id"]
+        reward_currency_id = target_card["card_product"]["reward_currency"]["id"]
+
+        async with session_factory() as session, session.begin():
+            travel_cat = await session.scalar(select(Category).where(Category.code == "travel"))
+            source = await session.scalar(select(RuleSource).order_by(RuleSource.id))
+            assert travel_cat is not None
+            assert source is not None
+
+            rule_v1 = EarningRule(
+                rule_key=rule_key,
+                version=1,
+                card_product_id=card_product_id,
+                reward_currency_id=reward_currency_id,
+                scope_type="category",
+                category_id=travel_cat.id,
+                multiplier=Decimal("3.0000"),
+                priority=100,
+                post_cap_behavior="fallback_to_base",
+                rounding="floor_units",
+                effective_from=date(2026, 1, 1),
+                effective_to=date(2026, 6, 30),
+                source_id=source.id,
+                last_reviewed_on=date(2026, 1, 15),
+            )
+            session.add(rule_v1)
+            await session.flush()
+            rule_v1_id = rule_v1.id
+            travel_cat_id = travel_cat.id
+            source_id = source.id
+
+        assert rule_v1_id is not None
+
+        # 1. Submit transaction inside v1 effective range (2026-01-01..2026-06-30)
+        tx1_res = await async_client.post(
+            "/api/v1/profiles/maya/transactions",
+            json={
+                "profile_card_id": card_id,
+                "amount_cents": 10000,
+                "category_code": "travel",
+                "occurred_on": "2026-05-15",
+                "note": "T32 v1 travel purchase",
+            },
+        )
+        assert tx1_res.status_code == 201
+        tx1_body = tx1_res.json()
+        tx1_id = tx1_body["id"]
+        tx1_calc_before = tx1_body["reward_calc"]
+
+        assert Decimal(tx1_calc_before["reward_units"]) == Decimal("300.0000")
+        assert tx1_calc_before["estimated_value_cents"] == 300
+        assert tx1_calc_before["trace"]["applied_portions"][0]["rule_id"] == rule_v1_id
+        assert tx1_calc_before["trace"]["applied_portions"][0]["rule_version"] == 1
+        assert rule_v1_id in tx1_calc_before["applied_rule_ids"]
+
+        # Capture exact DB snapshot row and CalcRuleReference rows before v2 is loaded
+        async with session_factory() as session:
+            db_calc_before = await session.scalar(
+                select(TransactionRewardCalc).where(TransactionRewardCalc.transaction_id == tx1_id)
+            )
+            db_refs_before = sorted(
+                (
+                    await session.scalars(
+                        select(CalcRuleReference.rule_id).where(
+                            CalcRuleReference.calc_id == tx1_calc_before["id"]
+                        )
+                    )
+                ).all()
+            )
+            assert db_calc_before is not None
+            db_calc_snapshot_before = (
+                db_calc_before.id,
+                db_calc_before.engine_version,
+                db_calc_before.reward_currency_id,
+                db_calc_before.reward_units,
+                db_calc_before.valuation_cents_per_unit_used,
+                db_calc_before.estimated_value_cents,
+                db_calc_before.trace,
+                db_calc_before.created_at,
+            )
+
+        # 2. Load rule v2 for the same rule_key with non-overlapping effective range
+        async with session_factory() as session, session.begin():
+            rule_v2 = EarningRule(
+                rule_key=rule_key,
+                version=2,
+                card_product_id=card_product_id,
+                reward_currency_id=reward_currency_id,
+                scope_type="category",
+                category_id=travel_cat_id,
+                multiplier=Decimal("5.0000"),
+                priority=100,
+                post_cap_behavior="fallback_to_base",
+                rounding="floor_units",
+                effective_from=date(2026, 7, 1),
+                effective_to=None,
+                source_id=source_id,
+                last_reviewed_on=date(2026, 7, 1),
+                supersedes_id=rule_v1_id,
+            )
+            session.add(rule_v2)
+            await session.flush()
+            rule_v2_id = rule_v2.id
+
+        assert rule_v2_id is not None
+
+        # 3. Submit new transaction inside v2 effective range (2026-07-01..)
+        tx2_res = await async_client.post(
+            "/api/v1/profiles/maya/transactions",
+            json={
+                "profile_card_id": card_id,
+                "amount_cents": 10000,
+                "category_code": "travel",
+                "occurred_on": "2026-08-15",
+                "note": "T32 v2 travel purchase",
+            },
+        )
+        assert tx2_res.status_code == 201
+        tx2_body = tx2_res.json()
+        tx2_calc = tx2_body["reward_calc"]
+
+        assert Decimal(tx2_calc["reward_units"]) == Decimal("500.0000")
+        assert tx2_calc["estimated_value_cents"] == 500
+        assert tx2_calc["trace"]["applied_portions"][0]["rule_id"] == rule_v2_id
+        assert tx2_calc["trace"]["applied_portions"][0]["rule_version"] == 2
+        assert rule_v2_id in tx2_calc["applied_rule_ids"]
+        assert rule_v1_id not in tx2_calc["applied_rule_ids"]
+
+        # Verify recommendation on v2 date also uses rule v2
+        rec_res = await async_client.post(
+            "/api/v1/profiles/maya/recommendations",
+            json={
+                "amount_cents": 10000,
+                "category_code": "travel",
+                "purchase_date": "2026-08-15",
+                "card_ids": [card_id],
+            },
+        )
+        assert rec_res.status_code == 200
+        rec_item = rec_res.json()["ranked"][0]
+        assert Decimal(rec_item["reward_units"]) == Decimal("500")
+        assert rec_item["applied"][0]["rule_id"] == rule_v2_id
+        assert rec_item["applied"][0]["rule_version"] == 2
+
+        # 4. Assert both transactions retrievable via GET and tx1 snapshot is 100% unchanged
+        listed = (await async_client.get("/api/v1/profiles/maya/transactions")).json()
+        assert [item["id"] for item in listed] == [tx2_body["id"], tx1_id]
+        listed_tx1 = next(item for item in listed if item["id"] == tx1_id)
+        assert listed_tx1["reward_calc"] == tx1_calc_before
+
+        async with session_factory() as session:
+            db_calc_after = await session.scalar(
+                select(TransactionRewardCalc).where(TransactionRewardCalc.transaction_id == tx1_id)
+            )
+            db_refs_after = sorted(
+                (
+                    await session.scalars(
+                        select(CalcRuleReference.rule_id).where(
+                            CalcRuleReference.calc_id == tx1_calc_before["id"]
+                        )
+                    )
+                ).all()
+            )
+            db_tx2_refs = sorted(
+                (
+                    await session.scalars(
+                        select(CalcRuleReference.rule_id).where(
+                            CalcRuleReference.calc_id == tx2_calc["id"]
+                        )
+                    )
+                ).all()
+            )
+            assert db_calc_after is not None
+            assert (
+                db_calc_after.id,
+                db_calc_after.engine_version,
+                db_calc_after.reward_currency_id,
+                db_calc_after.reward_units,
+                db_calc_after.valuation_cents_per_unit_used,
+                db_calc_after.estimated_value_cents,
+                db_calc_after.trace,
+                db_calc_after.created_at,
+            ) == db_calc_snapshot_before
+            assert db_refs_after == db_refs_before
+            assert rule_v1_id in db_refs_after
+            assert rule_v2_id not in db_refs_after
+            assert rule_v2_id in db_tx2_refs
+    finally:
+        await async_client.post("/api/v1/profiles/maya/reset")
+        if rule_v2_id is not None or rule_v1_id is not None:
+            async with session_factory() as session, session.begin():
+                if rule_v2_id is not None:
+                    await session.execute(delete(EarningRule).where(EarningRule.id == rule_v2_id))
+                if rule_v1_id is not None:
+                    await session.execute(delete(EarningRule).where(EarningRule.id == rule_v1_id))
