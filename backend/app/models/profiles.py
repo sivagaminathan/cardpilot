@@ -22,6 +22,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     exists,
     func,
     select,
@@ -64,6 +65,14 @@ class ProfileCard(Base):
     """A card product held within a profile."""
 
     __tablename__ = "profile_cards"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "card_product_id",
+            "nickname",
+            name="uq_profile_cards_profile_product_nickname",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     profile_id: Mapped[int] = mapped_column(

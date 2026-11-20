@@ -46,7 +46,7 @@ Conventions
 - [ ] **T23** Migrations + ORM for profiles, profile_cards, valuations, transactions, calcs, benefits, usages.
 - [ ] **T24** Seed data files: ≥6 fictional products, currencies, categories, merchants, sources, rules (include one superseded rule version, one capped rule, one exclusion, one threshold). *Done when:* data review against SPEC §4.2 checklist; every rule has source + last-reviewed date and is labeled fictional.
 - [x] **T25** Idempotent seed loader + demo profiles (≥2) + `POST /profiles/{id}/reset`. [AC-1]
-- [ ] **T26** Reference + profile + cards endpoints with schemas and tests.
+- [x] **T26** Reference + profile + cards endpoints with schemas and tests.
 - [ ] **T27** Valuations endpoints (validation range, `is_user_set`).
 - [ ] **T28** Service layer: assemble engine inputs from DB (rules, caps, spend history). *Done when:* integration test matches engine fixtures through the DB.
 - [ ] **T29** `POST /recommendations` endpoint + tests (all key ACs through HTTP). [AC-2…AC-7, AC-9, AC-13]
