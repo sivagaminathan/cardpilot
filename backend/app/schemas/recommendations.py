@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt, field_validator
 
 
 class ProfileSummary(BaseModel):
@@ -40,6 +40,23 @@ class RecommendationRequest(BaseModel):
     category_code: str = Field(..., min_length=1, max_length=64)
     merchant_id: int | None = None
     purchase_date: date | None = None
+    card_ids: list[StrictInt] | None = Field(
+        default=None,
+        description="Optional subset of profile card IDs to evaluate.",
+    )
+
+    @field_validator("card_ids")
+    @classmethod
+    def _validate_card_ids(cls, value: list[int] | None) -> list[int] | None:
+        if value is None:
+            return None
+        if len(value) == 0:
+            raise ValueError("card_ids must not be empty when provided.")
+        if any(cid <= 0 for cid in value):
+            raise ValueError("card_ids must contain only positive integers.")
+        if len(set(value)) != len(value):
+            raise ValueError("card_ids must not contain duplicate card IDs.")
+        return value
 
 
 class AppliedPortionSchema(BaseModel):
@@ -67,6 +84,7 @@ class CardRecommendationItem(BaseModel):
     message: str | None = None
     applied: list[AppliedPortionSchema]
     explanation: list[str]
+    warnings: list[str] = Field(default_factory=list)
 
 
 class RecommendationResponse(BaseModel):

@@ -201,6 +201,7 @@ def _to_item(ev: CardEvaluation, rank: int | None = None) -> CardRecommendationI
             for p in ev.applied_portions
         ],
         explanation=list(ev.explanation),
+        warnings=list(ev.warnings),
     )
 
 
@@ -409,7 +410,23 @@ async def recommend_for_profile(
             merchant_tags=merchant_tags,
         )
 
-        assembled = await assemble_profile_engine_inputs(session, profile.id, purchase_date)
+        assembled = await assemble_profile_engine_inputs(
+            session,
+            profile.id,
+            purchase_date,
+            card_ids=request.card_ids,
+        )
+        if request.card_ids is not None:
+            found_ids = {item.card.card_id for item in assembled}
+            missing_ids = [cid for cid in request.card_ids if cid not in found_ids]
+            if missing_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=(
+                        f"Profile card(s) {missing_ids} not found or inactive "
+                        f"for profile '{profile.slug}'."
+                    ),
+                )
         evaluations: list[CardEvaluation] = [
             evaluate_purchase(
                 purchase=purchase,
