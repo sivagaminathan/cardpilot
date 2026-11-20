@@ -11,6 +11,8 @@ from app.api.deps import get_db_session
 from app.schemas.catalog import (
     BenefitDefinitionSummary,
     CardProductSummary,
+    CurrencyValuationSummary,
+    CurrencyValuationUpdate,
     EarningRuleSummary,
     MerchantSummary,
     ProfileCardCreate,
@@ -28,8 +30,10 @@ from app.services.catalog import (
     list_card_products,
     list_merchants,
     list_profile_cards,
+    list_profile_valuations,
     list_reward_currencies,
     update_profile_card,
+    upsert_profile_valuation,
 )
 
 router = APIRouter(tags=["catalog"])
@@ -135,3 +139,26 @@ async def delete_profile_card_route(
     """Remove a card from a profile."""
     await delete_profile_card(session, profile_key, card_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/profiles/{profile_key}/valuations", response_model=list[CurrencyValuationSummary])
+async def get_profile_valuations(
+    profile_key: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[CurrencyValuationSummary]:
+    """List currency valuations configured for a profile."""
+    return await list_profile_valuations(session, profile_key)
+
+
+@router.put(
+    "/profiles/{profile_key}/valuations/{currency_key}",
+    response_model=CurrencyValuationSummary,
+)
+async def put_profile_valuation(
+    profile_key: str,
+    currency_key: str,
+    payload: CurrencyValuationUpdate,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> CurrencyValuationSummary:
+    """Create or update a profile's valuation for a reward currency."""
+    return await upsert_profile_valuation(session, profile_key, currency_key, payload)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -11,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.models import (
     BenefitDefinition,
     CardProduct,
+    CurrencyValuation,
     EarningRule,
     Merchant,
     Profile,
@@ -21,6 +24,8 @@ from app.models import (
 from app.schemas.catalog import (
     BenefitDefinitionSummary,
     CardProductSummary,
+    CurrencyValuationSummary,
+    CurrencyValuationUpdate,
     EarningRuleSummary,
     MerchantSummary,
     ProfileCardCreate,
@@ -435,3 +440,96 @@ async def delete_profile_card(session: AsyncSession, profile_key: str, card_id: 
         )
     await session.delete(card)
     await session.commit()
+
+
+def _to_valuation_summary(val: CurrencyValuation) -> CurrencyValuationSummary:
+    return CurrencyValuationSummary(
+        profile_id=val.profile_id,
+        reward_currency_id=val.reward_currency_id,
+        reward_currency=_to_currency_summary(val.reward_currency),
+        cents_per_unit=str(val.cents_per_unit),
+        is_user_set=val.is_user_set,
+        updated_at=val.updated_at,
+    )
+
+
+async def _resolve_currency(session: AsyncSession, currency_key: str) -> RewardCurrency:
+    if currency_key.isdigit():
+        currency = await session.scalar(
+            select(RewardCurrency).where(RewardCurrency.id == int(currency_key))
+        )
+    else:
+        currency = await session.scalar(
+            select(RewardCurrency).where(RewardCurrency.code == currency_key.upper())
+        )
+    if currency is None:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Reward currency '{currency_key}' not found.",
+        )
+    return currency
+
+
+async def list_profile_valuations(
+    session: AsyncSession, profile_key: str
+) -> list[CurrencyValuationSummary]:
+    """Return all currency valuations configured for the specified profile."""
+    profile = await resolve_profile(session, profile_key)
+    rows = (
+        await session.scalars(
+            select(CurrencyValuation)
+            .where(CurrencyValuation.profile_id == profile.id)
+            .options(selectinload(CurrencyValuation.reward_currency))
+            .order_by(CurrencyValuation.reward_currency_id)
+        )
+    ).all()
+    await session.commit()
+    return [_to_valuation_summary(v) for v in rows]
+
+
+async def upsert_profile_valuation(
+    session: AsyncSession,
+    profile_key: str,
+    currency_key: str,
+    payload: CurrencyValuationUpdate,
+) -> CurrencyValuationSummary:
+    """Create or update a profile's valuation for a reward currency and mark is_user_set=True."""
+    profile = await resolve_profile(session, profile_key)
+    currency = await _resolve_currency(session, currency_key)
+
+    existing = await session.scalar(
+        select(CurrencyValuation)
+        .where(
+            CurrencyValuation.profile_id == profile.id,
+            CurrencyValuation.reward_currency_id == currency.id,
+        )
+        .options(selectinload(CurrencyValuation.reward_currency))
+    )
+    now_utc = datetime.now(tz=UTC)
+    if existing is not None:
+        existing.cents_per_unit = payload.cents_per_unit
+        existing.is_user_set = True
+        existing.updated_at = now_utc
+    else:
+        session.add(
+            CurrencyValuation(
+                profile_id=profile.id,
+                reward_currency_id=currency.id,
+                cents_per_unit=payload.cents_per_unit,
+                is_user_set=True,
+                updated_at=now_utc,
+            )
+        )
+
+    await session.commit()
+    saved = await session.scalar(
+        select(CurrencyValuation)
+        .where(
+            CurrencyValuation.profile_id == profile.id,
+            CurrencyValuation.reward_currency_id == currency.id,
+        )
+        .options(selectinload(CurrencyValuation.reward_currency))
+    )
+    assert saved is not None
+    return _to_valuation_summary(saved)

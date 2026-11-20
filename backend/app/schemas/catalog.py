@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class RewardCurrencySummary(BaseModel):
@@ -135,3 +136,35 @@ class ProfileCardUpdate(BaseModel):
     nickname: str | None = Field(default=None, min_length=1, max_length=128)
     opened_on: date | None = None
     is_active: bool | None = None
+
+
+class CurrencyValuationSummary(BaseModel):
+    """Per-profile valuation for a reward currency."""
+
+    profile_id: int
+    reward_currency_id: int
+    reward_currency: RewardCurrencySummary
+    cents_per_unit: str
+    is_user_set: bool
+    updated_at: datetime
+
+
+class CurrencyValuationUpdate(BaseModel):
+    """Request payload to set or update a profile's currency valuation (0 < v <= 10)."""
+
+    cents_per_unit: Decimal = Field(
+        ...,
+        gt=Decimal("0"),
+        le=Decimal("10"),
+        description="Estimated USD cents per reward unit (0 < v <= 10).",
+    )
+
+    @field_validator("cents_per_unit")
+    @classmethod
+    def _validate_finite_decimal(cls, value: Decimal) -> Decimal:
+        if not value.is_finite():
+            raise ValueError("cents_per_unit must be a finite decimal.")
+        quantized = value.quantize(Decimal("0.0001"))
+        if quantized <= Decimal("0"):
+            raise ValueError("cents_per_unit must be greater than 0 after rounding.")
+        return quantized
