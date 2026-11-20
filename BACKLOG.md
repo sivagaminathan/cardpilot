@@ -48,7 +48,7 @@ Conventions
 - [x] **T25** Idempotent seed loader + demo profiles (≥2) + `POST /profiles/{id}/reset`. [AC-1]
 - [x] **T26** Reference + profile + cards endpoints with schemas and tests.
 - [x] **T27** Valuations endpoints (validation range, `is_user_set`).
-- [ ] **T28** Service layer: assemble engine inputs from DB (rules, caps, spend history). *Done when:* integration test matches engine fixtures through the DB.
+- [x] **T28** Service layer: assemble engine inputs from DB (rules, caps, spend history). *Done when:* integration test matches engine fixtures through the DB.
 - [ ] **T29** `POST /recommendations` endpoint + tests (all key ACs through HTTP). [AC-2…AC-7, AC-9, AC-13]
 - [ ] **T30** Sensitive-data guard (13–19 digit sequences) shared validator. [AC-12]
 - [ ] **T31** Transactions endpoints with snapshot persistence. [AC-8]

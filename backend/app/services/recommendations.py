@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
@@ -202,6 +204,144 @@ def _to_item(ev: CardEvaluation, rank: int | None = None) -> CardRecommendationI
     )
 
 
+@dataclass(frozen=True, slots=True)
+class AssembledCardInput:
+    """Engine inputs assembled from PostgreSQL for one active profile card."""
+
+    card: CardContext
+    spend_history: SpendHistory
+    valuation: Valuation | None
+
+
+async def assemble_profile_engine_inputs(
+    session: AsyncSession,
+    profile_id: int,
+    purchase_date: date,
+    *,
+    card_ids: Sequence[int] | None = None,
+) -> list[AssembledCardInput]:
+    """Load active cards, rules, caps, spend history, and valuations for a profile."""
+    card_stmt = (
+        select(ProfileCard)
+        .where(ProfileCard.profile_id == profile_id, ProfileCard.is_active.is_(True))
+        .options(selectinload(ProfileCard.card_product).selectinload(CardProduct.reward_currency))
+        .order_by(ProfileCard.id)
+    )
+    if card_ids is not None:
+        card_stmt = card_stmt.where(ProfileCard.id.in_(list(card_ids)))
+
+    profile_cards = (await session.scalars(card_stmt)).all()
+    valuations_rows = (
+        await session.scalars(
+            select(CurrencyValuation).where(CurrencyValuation.profile_id == profile_id)
+        )
+    ).all()
+    valuations_by_currency_id = {v.reward_currency_id: v for v in valuations_rows}
+
+    assembled: list[AssembledCardInput] = []
+    for pc in profile_cards:
+        product = pc.card_product
+        currency = product.reward_currency
+
+        db_rules = (
+            await session.scalars(
+                select(DbRule)
+                .where(DbRule.card_product_id == product.id)
+                .options(
+                    selectinload(DbRule.category),
+                    selectinload(DbRule.merchant),
+                    selectinload(DbRule.cap),
+                    selectinload(DbRule.exclusions).selectinload(
+                        DbRule.exclusions.property.mapper.class_.target_category
+                    ),
+                    selectinload(DbRule.exclusions).selectinload(
+                        DbRule.exclusions.property.mapper.class_.target_merchant
+                    ),
+                )
+                .order_by(DbRule.id)
+            )
+        ).all()
+
+        db_caps = (
+            await session.scalars(select(DbCap).where(DbCap.card_product_id == product.id))
+        ).all()
+
+        card_txs = (
+            await session.scalars(
+                select(Transaction).where(
+                    Transaction.profile_id == profile_id,
+                    Transaction.profile_card_id == pc.id,
+                    Transaction.occurred_on <= purchase_date,
+                )
+            )
+        ).all()
+
+        cap_spend: dict[str, int] = {}
+        for db_cap in db_caps:
+            bounds = get_period_bounds(
+                Period(db_cap.period),
+                purchase_date,
+                opened_on=pc.opened_on,
+            )
+            cap_spend[db_cap.cap_group_key] = sum(
+                tx.amount_cents
+                for tx in card_txs
+                if bounds.start_date <= tx.occurred_on <= bounds.end_date
+            )
+
+        threshold_spend: dict[str, int] = {}
+        for db_rule in db_rules:
+            if db_rule.threshold_period:
+                bounds = get_period_bounds(
+                    Period(db_rule.threshold_period),
+                    purchase_date,
+                    opened_on=pc.opened_on,
+                )
+                threshold_spend[db_rule.threshold_period] = sum(
+                    tx.amount_cents
+                    for tx in card_txs
+                    if bounds.start_date <= tx.occurred_on <= bounds.end_date
+                )
+
+        val_row = valuations_by_currency_id.get(currency.id)
+        valuation = (
+            Valuation(
+                reward_currency=currency.code,
+                cents_per_unit=Decimal(val_row.cents_per_unit),
+                is_user_set=val_row.is_user_set,
+            )
+            if val_row is not None
+            else None
+        )
+
+        ctx = CardContext(
+            card_id=pc.id,
+            card_name=pc.nickname,
+            reward_currency=currency.code,
+            rules=tuple(_to_engine_rule(r) for r in db_rules),
+            caps=tuple(
+                EngineCap(
+                    cap_group_key=c.cap_group_key,
+                    cap_amount_cents=c.cap_amount_cents,
+                    period=Period(c.period),
+                )
+                for c in db_caps
+            ),
+        )
+        assembled.append(
+            AssembledCardInput(
+                card=ctx,
+                spend_history=SpendHistory(
+                    cap_spend_cents=cap_spend,
+                    threshold_spend_cents=threshold_spend,
+                ),
+                valuation=valuation,
+            )
+        )
+
+    return assembled
+
+
 async def recommend_for_profile(
     session: AsyncSession,
     profile_key: str,
@@ -269,126 +409,16 @@ async def recommend_for_profile(
             merchant_tags=merchant_tags,
         )
 
-        profile_cards = (
-            await session.scalars(
-                select(ProfileCard)
-                .where(ProfileCard.profile_id == profile.id, ProfileCard.is_active.is_(True))
-                .options(
-                    selectinload(ProfileCard.card_product).selectinload(CardProduct.reward_currency)
-                )
-                .order_by(ProfileCard.id)
+        assembled = await assemble_profile_engine_inputs(session, profile.id, purchase_date)
+        evaluations: list[CardEvaluation] = [
+            evaluate_purchase(
+                purchase=purchase,
+                card=item.card,
+                spend_history=item.spend_history,
+                valuation=item.valuation,
             )
-        ).all()
-
-        valuations_rows = (
-            await session.scalars(
-                select(CurrencyValuation).where(CurrencyValuation.profile_id == profile.id)
-            )
-        ).all()
-        valuations_by_currency_id = {v.reward_currency_id: v for v in valuations_rows}
-
-        evaluations: list[CardEvaluation] = []
-        for pc in profile_cards:
-            product = pc.card_product
-            currency = product.reward_currency
-
-            db_rules = (
-                await session.scalars(
-                    select(DbRule)
-                    .where(DbRule.card_product_id == product.id)
-                    .options(
-                        selectinload(DbRule.category),
-                        selectinload(DbRule.merchant),
-                        selectinload(DbRule.cap),
-                        selectinload(DbRule.exclusions).selectinload(
-                            # load targets cleanly for engine conversion
-                            DbRule.exclusions.property.mapper.class_.target_category
-                        ),
-                        selectinload(DbRule.exclusions).selectinload(
-                            DbRule.exclusions.property.mapper.class_.target_merchant
-                        ),
-                    )
-                    .order_by(DbRule.id)
-                )
-            ).all()
-
-            db_caps = (
-                await session.scalars(select(DbCap).where(DbCap.card_product_id == product.id))
-            ).all()
-
-            card_txs = (
-                await session.scalars(
-                    select(Transaction).where(
-                        Transaction.profile_id == profile.id,
-                        Transaction.profile_card_id == pc.id,
-                        Transaction.occurred_on <= purchase_date,
-                    )
-                )
-            ).all()
-
-            cap_spend: dict[str, int] = {}
-            for db_cap in db_caps:
-                bounds = get_period_bounds(
-                    Period(db_cap.period),
-                    purchase_date,
-                    opened_on=pc.opened_on,
-                )
-                cap_spend[db_cap.cap_group_key] = sum(
-                    tx.amount_cents
-                    for tx in card_txs
-                    if bounds.start_date <= tx.occurred_on <= bounds.end_date
-                )
-
-            threshold_spend: dict[str, int] = {}
-            for db_rule in db_rules:
-                if db_rule.threshold_period:
-                    bounds = get_period_bounds(
-                        Period(db_rule.threshold_period),
-                        purchase_date,
-                        opened_on=pc.opened_on,
-                    )
-                    threshold_spend[db_rule.threshold_period] = sum(
-                        tx.amount_cents
-                        for tx in card_txs
-                        if bounds.start_date <= tx.occurred_on <= bounds.end_date
-                    )
-
-            val_row = valuations_by_currency_id.get(currency.id)
-            valuation = (
-                Valuation(
-                    reward_currency=currency.code,
-                    cents_per_unit=Decimal(val_row.cents_per_unit),
-                    is_user_set=val_row.is_user_set,
-                )
-                if val_row is not None
-                else None
-            )
-
-            ctx = CardContext(
-                card_id=pc.id,
-                card_name=pc.nickname,
-                reward_currency=currency.code,
-                rules=tuple(_to_engine_rule(r) for r in db_rules),
-                caps=tuple(
-                    EngineCap(
-                        cap_group_key=c.cap_group_key,
-                        cap_amount_cents=c.cap_amount_cents,
-                        period=Period(c.period),
-                    )
-                    for c in db_caps
-                ),
-            )
-            evaluations.append(
-                evaluate_purchase(
-                    purchase=purchase,
-                    card=ctx,
-                    spend_history=SpendHistory(
-                        cap_spend_cents=cap_spend,
-                        threshold_spend_cents=threshold_spend,
-                    ),
-                    valuation=valuation,
-                )
-            )
+            for item in assembled
+        ]
 
         ranked_res = rank_card_evaluations(evaluations)
         span.set_attribute("cardpilot.cards_evaluated", len(evaluations))
