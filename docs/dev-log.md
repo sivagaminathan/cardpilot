@@ -792,3 +792,16 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 33 source files.
   - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (65 files).
   - `npm --prefix frontend run lint`, `build`, `test`: Passed (0 errors, 11/11 tests).
+
+### Task T34: Rewards Summary Endpoint (`AC-10`, `FR-27`, `FR-29`)
+- **Date:** 2026-11-20
+- **What was done:**
+  - Added `CurrencyRewardSummary` and `RewardsSummaryResponse` schemas in `backend/app/schemas/rewards.py`.
+  - Added `get_rewards_summary` in `backend/app/services/rewards.py`, aggregating `TransactionRewardCalc.reward_units` per `reward_currency_id` scoped to the profile, valuing each currency with the profile's current `CurrencyValuation` via `app.engine.evaluate_valuation` (`ROUND_HALF_EVEN`), keeping currencies separate, excluding unvalued currencies from `estimated_total_usd_cents` with explicit `excluded_unvalued_currency_codes` and `limitation_message`, and leaving stored `TransactionRewardCalc` snapshots untouched.
+  - Added `GET /api/v1/profiles/{profile_key}/rewards/summary` in `backend/app/api/rewards.py` and registered it in `backend/app/api/routes.py`.
+  - Added PostgreSQL integration tests in `backend/tests/api/test_rewards.py`.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/api/test_rewards.py -v`: 3 passed in 3.07s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 370 passed in 74.05s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (92 files).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 49 source files.

@@ -54,7 +54,7 @@ Conventions
 - [x] **T31** Transactions endpoints with snapshot persistence. [AC-8]
 - [x] **T32** History-preservation test: load rule v2, assert old snapshot unchanged, new calc differs. [AC-8]
 - [x] **T33** Benefits: period math + status + usage endpoints. [AC-11]
-- [ ] **T34** Rewards summary endpoint (per-currency units; separate estimated USD). [AC-10]
+- [x] **T34** Rewards summary endpoint (per-currency units; separate estimated USD). [AC-10]
 - [ ] **T35** Error format (problem details), CORS, security headers, rate limit on mutations.
 - [ ] **T36** OpenAPI 3.1 export script + CI diff check; TS type generation script. [AC-14]
 - [ ] **Gate G3:** human demo of API via Swagger UI/curl; confirm contract before UI.
