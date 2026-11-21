@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, fetchProfiles, getApiBaseUrl, resetProfile } from './client';
+import {
+  ApiError,
+  fetchProfileBenefits,
+  fetchProfileCards,
+  fetchProfiles,
+  fetchRewardsSummary,
+  getApiBaseUrl,
+  resetProfile,
+} from './client';
 
 describe('API client', () => {
   afterEach(() => {
@@ -99,5 +107,67 @@ describe('API client', () => {
       expect((err as ApiError).status).toBe(503);
       expect((err as ApiError).title).toBe('HTTP 503');
     }
+  });
+
+  it('fetches profile cards, benefits, and rewards summary and propagates errors', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 10, nickname: 'Daily Cash', is_active: true }],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ benefit_id: 20, name: 'Monthly Dining Credit', status: 'unused' }],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          profile_id: 1,
+          profile_slug: 'maya',
+          currencies: [],
+          estimated_total_usd_cents: 0,
+          estimated_total_label: 'Estimated USD',
+          excluded_unvalued_currency_codes: [],
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ title: 'Not Found', status: 404, detail: 'Profile not found' }),
+      } as Response);
+
+    const cards = await fetchProfileCards('maya/1', 'https://api.cardpilot.demo');
+    expect(cards).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/cards',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const benefits = await fetchProfileBenefits('maya', 'https://api.cardpilot.demo/api/v1/');
+    expect(benefits).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://api.cardpilot.demo/api/v1/profiles/maya/benefits',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const summary = await fetchRewardsSummary('maya');
+    expect(summary.profile_slug).toBe('maya');
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/profiles/maya/rewards/summary',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    await expect(fetchRewardsSummary('missing')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 404,
+      detail: 'Profile not found',
+    });
   });
 });

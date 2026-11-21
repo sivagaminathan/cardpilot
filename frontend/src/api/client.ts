@@ -2,6 +2,9 @@ import type { components } from '../types/api.generated';
 
 export type ProfileSummary = components['schemas']['ProfileSummary'];
 export type ProfileResetResponse = components['schemas']['ProfileResetResponse'];
+export type ProfileCardSummary = components['schemas']['ProfileCardSummary'];
+export type BenefitStatusItem = components['schemas']['BenefitStatusItem'];
+export type RewardsSummaryResponse = components['schemas']['RewardsSummaryResponse'];
 
 export interface ValidationErrorDetail {
   loc: string[];
@@ -130,6 +133,39 @@ export async function resetProfile(
   return apiRequest<ProfileResetResponse>(
     `/profiles/${encodeURIComponent(profileKey)}/reset`,
     { method: 'POST' },
+    baseUrl,
+  );
+}
+
+export async function fetchProfileCards(
+  profileKey: string,
+  baseUrl?: string,
+): Promise<ProfileCardSummary[]> {
+  return apiRequest<ProfileCardSummary[]>(
+    `/profiles/${encodeURIComponent(profileKey)}/cards`,
+    { method: 'GET' },
+    baseUrl,
+  );
+}
+
+export async function fetchProfileBenefits(
+  profileKey: string,
+  baseUrl?: string,
+): Promise<BenefitStatusItem[]> {
+  return apiRequest<BenefitStatusItem[]>(
+    `/profiles/${encodeURIComponent(profileKey)}/benefits`,
+    { method: 'GET' },
+    baseUrl,
+  );
+}
+
+export async function fetchRewardsSummary(
+  profileKey: string,
+  baseUrl?: string,
+): Promise<RewardsSummaryResponse> {
+  return apiRequest<RewardsSummaryResponse>(
+    `/profiles/${encodeURIComponent(profileKey)}/rewards/summary`,
+    { method: 'GET' },
     baseUrl,
   );
 }

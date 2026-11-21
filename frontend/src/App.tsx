@@ -105,7 +105,7 @@ export const AppShell: React.FC = () => {
             path="/"
             element={
               <Dashboard
-                profileId={activeProfileKey || 'maya'}
+                profileId={activeProfileKey}
                 onNavigateTab={(tab) => navigate(tab === 'dashboard' ? '/' : `/${tab}`)}
               />
             }
