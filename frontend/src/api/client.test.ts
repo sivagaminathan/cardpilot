@@ -5,11 +5,14 @@ import {
   deleteProfileCard,
   fetchCardProductRules,
   fetchCardProducts,
+  fetchCategories,
+  fetchMerchants,
   fetchProfileBenefits,
   fetchProfileCards,
   fetchProfiles,
   fetchRewardsSummary,
   getApiBaseUrl,
+  recommendCards,
   resetProfile,
   updateProfileCard,
 } from './client';
@@ -307,6 +310,105 @@ describe('API client', () => {
           loc: ['body', 'nickname'],
           msg: 'Value must not contain 13-19 digit card numbers.',
           type: 'value_error',
+        },
+      ],
+    });
+  });
+
+  it('fetches categories and merchants and posts recommendation requests', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 1, code: 'dining', name: 'Dining' }],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 5, name: 'Harbor Bistro', default_category_code: 'dining', tags: [] }],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ranked: [],
+          unranked: [],
+          ineligible: [],
+          global_notes: [],
+          engine_version: '1.0.0',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          title: 'Unprocessable Entity',
+          status: 422,
+          detail: 'Validation failed.',
+          errors: [
+            {
+              loc: ['body', 'amount_cents'],
+              msg: 'Input should be greater than 0',
+              type: 'greater_than',
+            },
+          ],
+        }),
+      } as Response);
+
+    const categories = await fetchCategories('https://api.cardpilot.demo');
+    expect(categories).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://api.cardpilot.demo/api/v1/categories',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const merchants = await fetchMerchants('https://api.cardpilot.demo');
+    expect(merchants).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://api.cardpilot.demo/api/v1/merchants',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const rec = await recommendCards(
+      'maya/1',
+      {
+        amount_cents: 12500,
+        category_code: 'dining',
+        merchant_id: 5,
+        purchase_date: '2026-11-20',
+        card_ids: [101],
+      },
+      'https://api.cardpilot.demo',
+    );
+    expect(rec.engine_version).toBe('1.0.0');
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/recommendations',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          amount_cents: 12500,
+          category_code: 'dining',
+          merchant_id: 5,
+          purchase_date: '2026-11-20',
+          card_ids: [101],
+        }),
+      }),
+    );
+
+    await expect(
+      recommendCards('maya', { amount_cents: 0, category_code: 'dining' }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      errors: [
+        {
+          loc: ['body', 'amount_cents'],
+          msg: 'Input should be greater than 0',
+          type: 'greater_than',
         },
       ],
     });

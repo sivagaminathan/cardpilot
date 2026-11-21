@@ -2,11 +2,17 @@ import type { components } from '../types/api.generated';
 
 export type ProfileSummary = components['schemas']['ProfileSummary'];
 export type ProfileResetResponse = components['schemas']['ProfileResetResponse'];
+export type CategorySummary = components['schemas']['CategorySummary'];
+export type MerchantSummary = components['schemas']['MerchantSummary'];
 export type CardProductSummary = components['schemas']['CardProductSummary'];
 export type EarningRuleSummary = components['schemas']['EarningRuleSummary'];
 export type ProfileCardCreate = components['schemas']['ProfileCardCreate'];
 export type ProfileCardSummary = components['schemas']['ProfileCardSummary'];
 export type ProfileCardUpdate = components['schemas']['ProfileCardUpdate'];
+export type RecommendationRequest = components['schemas']['RecommendationRequest'];
+export type RecommendationResponse = components['schemas']['RecommendationResponse'];
+export type CardRecommendationItem = components['schemas']['CardRecommendationItem'];
+export type AppliedPortionSchema = components['schemas']['AppliedPortionSchema'];
 export type BenefitStatusItem = components['schemas']['BenefitStatusItem'];
 export type RewardsSummaryResponse = components['schemas']['RewardsSummaryResponse'];
 
@@ -228,6 +234,29 @@ export async function deleteProfileCard(
   return apiRequest<void>(
     `/profiles/${encodeURIComponent(profileKey)}/cards/${encodeURIComponent(String(cardId))}`,
     { method: 'DELETE' },
+    baseUrl,
+  );
+}
+
+export async function fetchCategories(baseUrl?: string): Promise<CategorySummary[]> {
+  return apiRequest<CategorySummary[]>('/categories', { method: 'GET' }, baseUrl);
+}
+
+export async function fetchMerchants(baseUrl?: string): Promise<MerchantSummary[]> {
+  return apiRequest<MerchantSummary[]>('/merchants', { method: 'GET' }, baseUrl);
+}
+
+export async function recommendCards(
+  profileKey: string,
+  payload: RecommendationRequest,
+  baseUrl?: string,
+): Promise<RecommendationResponse> {
+  return apiRequest<RecommendationResponse>(
+    `/profiles/${encodeURIComponent(profileKey)}/recommendations`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
     baseUrl,
   );
 }

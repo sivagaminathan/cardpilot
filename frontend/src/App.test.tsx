@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { App } from './App';
 import { BackendStatus, getHealthUrl } from './components/BackendStatus';
-import { formatCentsToUsd } from './lib/formatters';
+import { formatCentsToUsd, getTodayLocalIsoDate, parseUsdToCents } from './lib/formatters';
 import { getRuleStaleness } from './lib/rules';
 
 const MOCK_PROFILES = [
@@ -1555,5 +1555,454 @@ describe('T39 Cards and Rules views', () => {
     fireEvent.click(retryRules);
 
     expect(await screen.findByText('nwcash.dining')).toBeInTheDocument();
+  });
+});
+
+const MOCK_CATEGORIES = [
+  { id: 1, code: 'groceries', name: 'Groceries' },
+  { id: 2, code: 'dining', name: 'Dining' },
+  { id: 3, code: 'travel', name: 'Travel' },
+];
+
+const MOCK_MERCHANTS = [
+  {
+    id: 10,
+    name: 'Harbor Bistro',
+    default_category_code: 'dining',
+    default_category_id: 2,
+    tags: ['restaurant'],
+  },
+  {
+    id: 11,
+    name: 'FreshMart',
+    default_category_code: 'groceries',
+    default_category_id: 1,
+    tags: ['supermarket'],
+  },
+];
+
+const MOCK_RECOMMENDATION_RESPONSE = {
+  engine_version: '1.0.0',
+  global_notes: [
+    'Annual fees and benefit credits are excluded from recommendation ranking.',
+    'Tie broken deterministically by profile card id.',
+  ],
+  ranked: [
+    {
+      rank: 1,
+      profile_card_id: 101,
+      card_name: 'Daily Cash',
+      reward_currency: 'NW_CASH',
+      status: 'ranked',
+      reward_units: '4.0000',
+      estimated_value_cents: 400,
+      reason: null,
+      message: null,
+      applied: [
+        {
+          portion_cents: 5000,
+          rule_id: 11,
+          rule_key: 'nwcash.dining',
+          rule_version: 1,
+          multiplier: '5.0',
+          reward_units: '2.5000',
+        },
+        {
+          portion_cents: 5000,
+          rule_id: 12,
+          rule_key: 'nwcash.base',
+          rule_version: 1,
+          multiplier: '1.0',
+          reward_units: '0.5000',
+        },
+      ],
+      explanation: [
+        'Matched dining 5x rule up to remaining $50.00 quarterly cap.',
+        'Remaining $50.00 fell back to base 1x rule.',
+      ],
+      warnings: ['Cap nearly exhausted: $0.00 remaining after this purchase.'],
+    },
+  ],
+  unranked: [
+    {
+      rank: null,
+      profile_card_id: 103,
+      card_name: 'Skyward Miles Card',
+      reward_currency: 'SKY_MILES',
+      status: 'unranked',
+      reward_units: '300.0000',
+      estimated_value_cents: null,
+      reason: 'no_valuation',
+      message: 'No valuation configured for SKY_MILES; configure it in Settings.',
+      applied: [
+        {
+          portion_cents: 10000,
+          rule_id: 21,
+          rule_key: 'skyward.dining',
+          rule_version: 1,
+          multiplier: '3.0',
+          reward_units: '300.0000',
+        },
+      ],
+      explanation: ['Earned 300.0000 SKY_MILES under dining 3x rule.'],
+      warnings: [],
+    },
+  ],
+  ineligible: [
+    {
+      rank: null,
+      profile_card_id: 104,
+      card_name: 'Legacy Card',
+      reward_currency: 'NW_CASH',
+      status: 'ineligible',
+      reward_units: '0.0000',
+      estimated_value_cents: null,
+      reason: 'no_effective_rule',
+      message: 'No earning rule is effective on the selected purchase date.',
+      applied: [],
+      explanation: ['All rules expired prior to 2026-11-20.'],
+      warnings: ['Rule expired.'],
+    },
+  ],
+};
+
+function mockT40Fetch(options?: {
+  profiles?: typeof MOCK_PROFILES;
+  categoriesOk?: boolean;
+  merchantsOk?: boolean;
+  recommendOk?: boolean;
+  recommendationPayload?: typeof MOCK_RECOMMENDATION_RESPONSE;
+}) {
+  const profiles = options?.profiles ?? MOCK_PROFILES;
+  const categoriesOk = options?.categoriesOk ?? true;
+  const merchantsOk = options?.merchantsOk ?? true;
+  const recommendOk = options?.recommendOk ?? true;
+  const recommendationPayload = options?.recommendationPayload ?? MOCK_RECOMMENDATION_RESPONSE;
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? 'GET';
+
+    if (url.endsWith('/healthz')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', version: '0.1.0' }),
+      } as Response;
+    }
+    if (url.endsWith('/profiles') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => profiles } as Response;
+    }
+    if (url.endsWith('/categories') && method === 'GET') {
+      if (!categoriesOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Error', detail: 'Categories unavailable' }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => MOCK_CATEGORIES } as Response;
+    }
+    if (url.endsWith('/merchants') && method === 'GET') {
+      if (!merchantsOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Error', detail: 'Merchants unavailable' }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => MOCK_MERCHANTS } as Response;
+    }
+    if (url.endsWith('/profiles/maya/cards') && method === 'GET') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [
+          ...(MOCK_CARDS.maya as Array<Record<string, unknown>>),
+          {
+            ...(MOCK_CARDS.maya[0] as Record<string, unknown>),
+            id: 103,
+            nickname: 'Skyward Miles Card',
+            is_active: true,
+          },
+        ],
+      } as Response;
+    }
+    if (url.endsWith('/profiles/dev/cards') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => MOCK_CARDS.dev } as Response;
+    }
+    if (url.includes('/recommendations') && method === 'POST') {
+      if (!recommendOk) {
+        return {
+          ok: false,
+          status: 422,
+          json: async () => ({
+            title: 'Unprocessable Entity',
+            status: 422,
+            detail: 'Invalid recommendation payload.',
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => recommendationPayload,
+      } as Response;
+    }
+    return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+  });
+}
+
+describe('T40 Compare view', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('parses positive USD strings into integer cents without floats and formats local date', () => {
+    expect(parseUsdToCents('125.00')).toBe(12500);
+    expect(parseUsdToCents('125')).toBe(12500);
+    expect(parseUsdToCents('10.5')).toBe(1050);
+    expect(parseUsdToCents('.99')).toBe(99);
+    expect(parseUsdToCents('0')).toBeNull();
+    expect(parseUsdToCents('0.00')).toBeNull();
+    expect(parseUsdToCents('-5.00')).toBeNull();
+    expect(parseUsdToCents('1.234')).toBeNull();
+    expect(parseUsdToCents('abc')).toBeNull();
+    expect(parseUsdToCents('')).toBeNull();
+
+    expect(getTodayLocalIsoDate(new Date(2026, 10, 5, 23, 45))).toBe('2026-11-05');
+  });
+
+  it('populates form from categories/merchants/active cards, auto-fills category, and respects manual override', async () => {
+    const fetchSpy = mockT40Fetch();
+    render(<App initialEntries={['/compare']} />);
+
+    const categorySelect = await screen.findByLabelText('Category');
+    const merchantSelect = await screen.findByLabelText('Merchant (optional)');
+    expect(await screen.findByLabelText(/Daily Cash/)).toBeInTheDocument();
+    expect(screen.getByText('1 inactive card is excluded by default.')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Skyward Explorer/)).not.toBeInTheDocument();
+
+    // Auto-fill category from merchant default_category_code
+    fireEvent.change(merchantSelect, { target: { value: '10' } });
+    expect(categorySelect).toHaveValue('dining');
+
+    // Manual override is preserved when merchant changes or is cleared
+    fireEvent.change(categorySelect, { target: { value: 'travel' } });
+    fireEvent.change(merchantSelect, { target: { value: '11' } });
+    expect(categorySelect).toHaveValue('travel');
+    fireEvent.change(merchantSelect, { target: { value: '' } });
+    expect(categorySelect).toHaveValue('travel');
+
+    // All active cards selected -> card_ids: null
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '100.00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+
+    await screen.findByText('Comparison Results');
+    const firstPost = fetchSpy.mock.calls.find(
+      ([u, init]) => String(u).includes('/recommendations') && init?.method === 'POST',
+    );
+    expect(JSON.parse(String(firstPost?.[1]?.body))).toMatchObject({
+      amount_cents: 10000,
+      category_code: 'travel',
+      merchant_id: null,
+      card_ids: null,
+    });
+
+    // Uncheck one card -> sends strict subset card_ids: [101]
+    fireEvent.click(screen.getByLabelText(/Skyward Miles Card/));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+
+    await waitFor(() => {
+      const posts = fetchSpy.mock.calls.filter(
+        ([u, init]) => String(u).includes('/recommendations') && init?.method === 'POST',
+      );
+      expect(posts).toHaveLength(2);
+      expect(JSON.parse(String(posts[1]?.[1]?.body))).toMatchObject({
+        card_ids: [101],
+      });
+    });
+  });
+
+  it('renders ranked, unranked, ineligible, applied cap-straddle, warnings, global notes, and explanation toggle', async () => {
+    mockT40Fetch();
+    render(<App initialEntries={['/compare']} />);
+
+    await screen.findByLabelText('Category');
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+
+    expect(await screen.findByText('Engine v1.0.0')).toBeInTheDocument();
+    expect(screen.getByText('Ranked Cards (1)')).toBeInTheDocument();
+    expect(screen.getByText('Unranked Cards (1)')).toBeInTheDocument();
+    expect(screen.getByText('Ineligible Cards (1)')).toBeInTheDocument();
+
+    // Ranked + cap straddle + warnings + explanation toggle
+    const rankedItem = screen.getByTestId('compare-ranked-item');
+    expect(within(rankedItem).getByText('#1 Daily Cash')).toBeInTheDocument();
+    expect(within(rankedItem).getByText('$4.00')).toBeInTheDocument();
+    expect(within(rankedItem).getByText(/\$50\.00 at 5\.0× \(nwcash\.dining v1\)/)).toBeInTheDocument();
+    expect(within(rankedItem).getByText(/\$50\.00 at 1\.0× \(nwcash\.base v1\)/)).toBeInTheDocument();
+    expect(
+      within(rankedItem).getByText(/Cap nearly exhausted: \$0\.00 remaining/),
+    ).toBeInTheDocument();
+
+    const toggleBtn = within(rankedItem).getByRole('button', { name: 'Show explanation' });
+    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(rankedItem).queryByText(/Matched dining 5x rule/),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+    expect(toggleBtn).toHaveTextContent('Hide explanation');
+    expect(within(rankedItem).getByText(/Matched dining 5x rule/)).toBeInTheDocument();
+
+    // Unranked & Ineligible
+    const unrankedItem = screen.getByTestId('compare-unranked-item');
+    expect(
+      within(unrankedItem).getByText('No valuation configured for SKY_MILES; configure it in Settings.'),
+    ).toBeInTheDocument();
+    const ineligibleItem = screen.getByTestId('compare-ineligible-item');
+    expect(
+      within(ineligibleItem).getByText('No earning rule is effective on the selected purchase date.'),
+    ).toBeInTheDocument();
+
+    // Global notes
+    expect(
+      screen.getByText('Annual fees and benefit credits are excluded from recommendation ranking.'),
+    ).toBeInTheDocument();
+  });
+
+  it('validates amount and empty card subset, handles API error, and recovers on retry', async () => {
+    const fetchSpy = mockT40Fetch({ recommendOk: false });
+    render(<App initialEntries={['/compare']} />);
+
+    await screen.findByLabelText(/Daily Cash/);
+
+    // Invalid amount -> no POST
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '12.345' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Enter a positive USD amount with up to two decimal places',
+    );
+    expect(fetchSpy.mock.calls.some(([u]) => String(u).includes('/recommendations'))).toBe(false);
+
+    // Uncheck all active cards -> no POST
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '50.00' } });
+    fireEvent.click(screen.getByLabelText(/Daily Cash/));
+    fireEvent.click(screen.getByLabelText(/Skyward Miles Card/));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Select at least one active card to compare.',
+    );
+
+    // Re-check card and hit API 422 error
+    fireEvent.click(screen.getByLabelText(/Daily Cash/));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid recommendation payload.');
+
+    // Recover on resubmit
+    mockT40Fetch({ recommendOk: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+    expect(await screen.findByText('Comparison Results')).toBeInTheDocument();
+  });
+
+  it('clears results on profile switch and isolates in-flight recommendation responses', async () => {
+    let resolveDeferredPost!: (res: Response) => void;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/healthz')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ status: 'ok' }),
+        } as Response);
+      }
+      if (url.endsWith('/profiles')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_PROFILES,
+        } as Response);
+      }
+      if (url.endsWith('/categories')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_CATEGORIES,
+        } as Response);
+      }
+      if (url.endsWith('/merchants')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_MERCHANTS,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/maya/cards')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_CARDS.maya,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/dev/cards')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_CARDS.dev,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/maya/recommendations') && method === 'POST') {
+        return new Promise<Response>((resolve) => {
+          resolveDeferredPost = resolve;
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+        json: async () => ({ title: 'Not Found' }),
+      } as Response);
+    });
+
+    render(<App initialEntries={['/compare']} />);
+    await screen.findByLabelText(/Daily Cash/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Cards' }));
+
+    // Switch to Dev before Maya's recommendation settles
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    expect(await screen.findByLabelText(/Summit Points/)).toBeInTheDocument();
+
+    resolveDeferredPost({
+      ok: true,
+      status: 200,
+      json: async () => MOCK_RECOMMENDATION_RESPONSE,
+    } as Response);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Comparison Results')).not.toBeInTheDocument();
+    });
+  });
+
+  it('disables comparison and issues no profile requests when no profile is selected', async () => {
+    const fetchSpy = mockT40Fetch({ profiles: [] });
+    render(<App initialEntries={['/compare']} />);
+
+    expect(
+      await screen.findByText('Select a demo profile to compare cards.'),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Compare Cards' })).toBeDisabled();
+    expect(
+      fetchSpy.mock.calls.some(([u]) => String(u).includes('/profiles/')),
+    ).toBe(false);
   });
 });

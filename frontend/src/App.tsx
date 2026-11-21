@@ -117,7 +117,7 @@ export const AppShell: React.FC<AppShellProps> = ({ rulesReferenceDate }) => {
             }
           />
           <Route path="/cards" element={<CardsView profileId={activeProfileKey} />} />
-          <Route path="/compare" element={<CompareView profileId={activeProfileKey || 'maya'} />} />
+          <Route path="/compare" element={<CompareView profileId={activeProfileKey} />} />
           <Route
             path="/transactions"
             element={

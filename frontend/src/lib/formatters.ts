@@ -28,3 +28,36 @@ export function formatRewardUnits(units: number | string, currencyName: string):
   const numStr = typeof units === 'number' ? units.toFixed(2) : units;
   return `${numStr} ${currencyName}`;
 }
+
+const USD_AMOUNT_PATTERN = /^\s*(?:(\d+)(?:\.(\d{1,2}))?|\.(\d{1,2}))\s*$/;
+
+/**
+ * Parse a positive USD string into integer cents without floating-point arithmetic.
+ * Rejects zero, negative values, malformed strings, and more than 2 decimal places.
+ */
+export function parseUsdToCents(input: string): number | null {
+  const match = USD_AMOUNT_PATTERN.exec(input);
+  if (!match) {
+    return null;
+  }
+  const dollarsStr = match[1] ?? '0';
+  const rawCents = match[2] ?? match[3] ?? '';
+  const centsStr = rawCents.padEnd(2, '0');
+  const dollars = Number.parseInt(dollarsStr, 10);
+  const cents = Number.parseInt(centsStr, 10);
+  const totalCents = dollars * 100 + cents;
+  if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
+    return null;
+  }
+  return totalCents;
+}
+
+/**
+ * Return today's local calendar date formatted as YYYY-MM-DD.
+ */
+export function getTodayLocalIsoDate(now: Date = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
