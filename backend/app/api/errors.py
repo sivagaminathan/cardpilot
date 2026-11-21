@@ -86,6 +86,8 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle unexpected exceptions with RFC 9457 Problem Details without stack traces."""
+    from app.api.security import get_security_headers
+
     problem = ProblemDetails(
         type="https://cardpilot.demo/errors/internal-error",
         title="Internal Server Error",
@@ -93,8 +95,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         detail="An unexpected internal error occurred.",
         instance=str(request.url.path),
     )
+    is_production = bool(getattr(getattr(request.app, "state", None), "is_production", False))
+    headers = {"Content-Type": "application/problem+json"}
+    for name, value in get_security_headers(request.url.path, is_production=is_production):
+        headers[name.decode("ascii")] = value.decode("ascii")
     return JSONResponse(
         status_code=500,
         content=problem.model_dump(exclude_none=True),
-        headers={"Content-Type": "application/problem+json"},
+        headers=headers,
     )

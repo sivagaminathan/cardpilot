@@ -17,6 +17,7 @@ from app.api.errors import (
     validation_exception_handler,
 )
 from app.api.routes import api_router
+from app.api.security import MutationRateLimitMiddleware, SecurityHeadersMiddleware
 from app.config import Settings, get_settings
 from app.db import check_db_health, close_engine
 from app.telemetry import setup_telemetry, shutdown_telemetry
@@ -46,13 +47,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    # CORS configuration
+    app.state.is_production = app_settings.is_production
+
+    # Middleware stack (LIFO: SecurityHeadersMiddleware is outermost)
+    if app_settings.rate_limit_enabled:
+        app.add_middleware(
+            MutationRateLimitMiddleware,
+            max_requests=app_settings.rate_limit_requests,
+            window_seconds=app_settings.rate_limit_window_seconds,
+            trust_proxy_headers=app_settings.trust_proxy_headers,
+            trusted_proxy_count=app_settings.trusted_proxy_count,
+        )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origin_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Accept", "Content-Type", "X-Request-ID"],
+    )
+
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        is_production=app_settings.is_production,
     )
 
     # Register error handlers
@@ -93,7 +110,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Database unreachable: {exc}",
+                detail="Database unreachable.",
             ) from exc
 
     # Mount versioned API routes

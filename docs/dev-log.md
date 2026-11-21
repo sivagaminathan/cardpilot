@@ -805,3 +805,18 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 370 passed in 74.05s (96.78% engine branch coverage).
   - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (92 files).
   - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 49 source files.
+
+### Task T35: API Security Hardening (`NFR-6`)
+- **Date:** 2026-11-20
+- **What was done:**
+  - Restricted CORS in `backend/app/main.py` to explicit methods (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`) and headers (`Accept`, `Content-Type`, `X-Request-ID`), and added production CORS validation in `backend/app/config.py` rejecting wildcard `*` or empty `CORS_ORIGINS`.
+  - Added `SecurityHeadersMiddleware` and `get_security_headers` in `backend/app/api/security.py` (plus security headers on `unhandled_exception_handler` in `backend/app/api/errors.py`), setting `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `Cache-Control: no-store` on `/api/`, and `Strict-Transport-Security` in production.
+  - Added `MutationRateLimitMiddleware` and `SlidingWindowRateLimiter` in `backend/app/api/security.py` (configurable via `RATE_LIMIT_ENABLED`, `RATE_LIMIT_REQUESTS`, `RATE_LIMIT_WINDOW_SECONDS`, `TRUST_PROXY_HEADERS` [default `False`], `TRUSTED_PROXY_COUNT` [default `1`] in `backend/app/config.py`), parsing `X-Forwarded-For` from the trusted right side with `ipaddress.ip_address` validation, pruning expired buckets under `asyncio.Lock`, and returning RFC 9457 `429 Too Many Requests` Problem Details with `Retry-After` and `X-RateLimit-*` headers on mutating `/api/` endpoints while keeping `GET`s (`/healthz`, `/readyz`, `/metrics`) exempt.
+  - Normalized and validated `CORS_ORIGINS` (stripping whitespace/trailing slashes, deduplicating, rejecting malformed origins/non-HTTP(S) schemes) and wired `app.state.is_production` so `unhandled_exception_handler` also reuses `get_security_headers` (including HSTS in production).
+  - Sanitized `/readyz` database error detail in `backend/app/main.py` so raw exception strings are not exposed.
+  - Added security tests in `backend/tests/api/test_security.py`.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend --extra dev pytest tests/api/test_security.py -v`: 6 passed in 0.56s.
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 376 passed in 128.23s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (94 files).
+  - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 50 source files.
