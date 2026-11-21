@@ -123,3 +123,6 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cardpilot
         run: make test
+
+      - name: Check OpenAPI 3.1 export and generated TypeScript types (AC-14)
+        run: make openapi-check

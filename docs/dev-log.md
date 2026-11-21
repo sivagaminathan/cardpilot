@@ -820,3 +820,16 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 376 passed in 128.23s (96.78% engine branch coverage).
   - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (94 files).
   - `uv run --directory backend --extra dev mypy app`: Success: no issues found in 50 source files.
+
+### Task T36: OpenAPI 3.1 Export & TypeScript Type Generation (`AC-14`, `FR-31`)
+- **Date:** 2026-11-20
+- **What was done:**
+  - Added `backend/scripts/export_openapi.py` to deterministically export FastAPI's OpenAPI 3.1 schema (`sort_keys=True`, LF line endings) to `docs/openapi.json` and verify staleness via `--check`.
+  - Pinned `openapi-typescript` (`7.13.0`) in `frontend/package.json` (`package-lock.json`), added `openapi:types` and `openapi:check` (`frontend/scripts/check-openapi-types.mjs`), and generated `frontend/src/types/api.generated.ts`.
+  - Updated `Makefile` (`openapi`, `openapi-check`) and `.github/workflows/ci.yml` (`make openapi-check` step).
+  - Added `backend/tests/test_openapi_export.py` verifying OpenAPI 3.1 validity, determinism, and `--check` pass/fail behavior.
+- **Verification & Testing (Actual Results):**
+  - `uv run --directory backend python scripts/export_openapi.py --check` & `npm --prefix frontend run openapi:check`: Up to date (exit 0).
+  - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 378 passed in 128.76s (96.78% engine branch coverage).
+  - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (96 files); `mypy app`: Success (50 source files).
+  - `npm --prefix frontend run lint`, `npm --prefix frontend run build`, `npm --prefix frontend test`: Clean (0 errors, 11/11 tests).

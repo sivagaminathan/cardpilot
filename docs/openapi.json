@@ -1,0 +1,3051 @@
+{
+  "components": {
+    "schemas": {
+      "AppliedPortionSchema": {
+        "description": "Portion of a purchase evaluated under a specific earning rule.",
+        "properties": {
+          "multiplier": {
+            "title": "Multiplier",
+            "type": "string"
+          },
+          "portion_cents": {
+            "title": "Portion Cents",
+            "type": "integer"
+          },
+          "reward_units": {
+            "title": "Reward Units",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "integer"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "portion_cents",
+          "rule_id",
+          "rule_key",
+          "rule_version",
+          "multiplier",
+          "reward_units"
+        ],
+        "title": "AppliedPortionSchema",
+        "type": "object"
+      },
+      "BenefitDefinitionSummary": {
+        "description": "Card product benefit definition with source metadata.",
+        "properties": {
+          "benefit_type": {
+            "title": "Benefit Type",
+            "type": "string"
+          },
+          "effective_from": {
+            "format": "date",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "reset_period": {
+            "title": "Reset Period",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RuleSourceSummary"
+          },
+          "value_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Cents"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "benefit_type",
+          "reset_period",
+          "notes",
+          "effective_from",
+          "source"
+        ],
+        "title": "BenefitDefinitionSummary",
+        "type": "object"
+      },
+      "BenefitStatusItem": {
+        "description": "Benefit status for a profile card within the current reset period.",
+        "properties": {
+          "benefit_id": {
+            "title": "Benefit Id",
+            "type": "integer"
+          },
+          "benefit_type": {
+            "title": "Benefit Type",
+            "type": "string"
+          },
+          "card_name": {
+            "title": "Card Name",
+            "type": "string"
+          },
+          "card_product_id": {
+            "title": "Card Product Id",
+            "type": "integer"
+          },
+          "card_product_name": {
+            "title": "Card Product Name",
+            "type": "string"
+          },
+          "days_until_reset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Until Reset"
+          },
+          "is_over_used": {
+            "title": "Is Over Used",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_reset_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Reset Date"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "over_used_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Over Used Cents"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "profile_card_id": {
+            "title": "Profile Card Id",
+            "type": "integer"
+          },
+          "remaining_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Cents"
+          },
+          "reset_period": {
+            "title": "Reset Period",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "usage_count": {
+            "title": "Usage Count",
+            "type": "integer"
+          },
+          "usages": {
+            "items": {
+              "$ref": "#/components/schemas/BenefitUsageSummary"
+            },
+            "title": "Usages",
+            "type": "array"
+          },
+          "used_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Cents"
+          },
+          "value_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Cents"
+          }
+        },
+        "required": [
+          "benefit_id",
+          "profile_card_id",
+          "card_name",
+          "card_product_id",
+          "card_product_name",
+          "name",
+          "benefit_type",
+          "reset_period",
+          "notes",
+          "is_over_used",
+          "usage_count",
+          "status",
+          "usages"
+        ],
+        "title": "BenefitStatusItem",
+        "type": "object"
+      },
+      "BenefitUsageCreate": {
+        "description": "Request payload to log a usage entry against a card benefit.",
+        "properties": {
+          "amount_cents": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Cents"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Note",
+            "type": "string"
+          },
+          "profile_card_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Profile Card Id",
+            "type": "integer"
+          },
+          "used_on": {
+            "format": "date",
+            "title": "Used On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_card_id",
+          "used_on"
+        ],
+        "title": "BenefitUsageCreate",
+        "type": "object"
+      },
+      "BenefitUsageSummary": {
+        "description": "Persisted benefit usage entry.",
+        "properties": {
+          "amount_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Cents"
+          },
+          "benefit_definition_id": {
+            "title": "Benefit Definition Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "profile_card_id": {
+            "title": "Profile Card Id",
+            "type": "integer"
+          },
+          "used_on": {
+            "format": "date",
+            "title": "Used On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "profile_card_id",
+          "benefit_definition_id",
+          "used_on",
+          "note"
+        ],
+        "title": "BenefitUsageSummary",
+        "type": "object"
+      },
+      "CardProductSummary": {
+        "description": "Fictional card product catalog item.",
+        "properties": {
+          "annual_fee_cents": {
+            "title": "Annual Fee Cents",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "issuer_name": {
+            "title": "Issuer Name",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "network_label": {
+            "title": "Network Label",
+            "type": "string"
+          },
+          "reward_currency": {
+            "$ref": "#/components/schemas/RewardCurrencySummary"
+          }
+        },
+        "required": [
+          "id",
+          "issuer_name",
+          "name",
+          "annual_fee_cents",
+          "network_label",
+          "description",
+          "reward_currency"
+        ],
+        "title": "CardProductSummary",
+        "type": "object"
+      },
+      "CardRecommendationItem": {
+        "description": "Single card evaluation outcome in a recommendation response.",
+        "properties": {
+          "applied": {
+            "items": {
+              "$ref": "#/components/schemas/AppliedPortionSchema"
+            },
+            "title": "Applied",
+            "type": "array"
+          },
+          "card_name": {
+            "title": "Card Name",
+            "type": "string"
+          },
+          "estimated_value_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Value Cents"
+          },
+          "explanation": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Explanation",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "profile_card_id": {
+            "title": "Profile Card Id",
+            "type": "integer"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reward_currency": {
+            "title": "Reward Currency",
+            "type": "string"
+          },
+          "reward_units": {
+            "title": "Reward Units",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profile_card_id",
+          "card_name",
+          "reward_currency",
+          "status",
+          "reward_units",
+          "applied",
+          "explanation"
+        ],
+        "title": "CardRecommendationItem",
+        "type": "object"
+      },
+      "CategorySummary": {
+        "description": "Spending category metadata.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ],
+        "title": "CategorySummary",
+        "type": "object"
+      },
+      "CurrencyRewardSummary": {
+        "description": "Accumulated reward units and current valuation estimate for one reward currency.",
+        "properties": {
+          "current_cents_per_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Cents Per Unit"
+          },
+          "estimated_value_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Value Cents"
+          },
+          "is_user_set": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is User Set"
+          },
+          "is_valued": {
+            "title": "Is Valued",
+            "type": "boolean"
+          },
+          "limitation_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitation Note"
+          },
+          "reward_currency_code": {
+            "title": "Reward Currency Code",
+            "type": "string"
+          },
+          "reward_currency_id": {
+            "title": "Reward Currency Id",
+            "type": "integer"
+          },
+          "reward_currency_kind": {
+            "title": "Reward Currency Kind",
+            "type": "string"
+          },
+          "reward_currency_name": {
+            "title": "Reward Currency Name",
+            "type": "string"
+          },
+          "total_reward_units": {
+            "title": "Total Reward Units",
+            "type": "string"
+          },
+          "transaction_count": {
+            "title": "Transaction Count",
+            "type": "integer"
+          },
+          "valuation_status": {
+            "title": "Valuation Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reward_currency_id",
+          "reward_currency_code",
+          "reward_currency_name",
+          "reward_currency_kind",
+          "total_reward_units",
+          "transaction_count",
+          "is_valued",
+          "valuation_status"
+        ],
+        "title": "CurrencyRewardSummary",
+        "type": "object"
+      },
+      "CurrencyValuationSummary": {
+        "description": "Per-profile valuation for a reward currency.",
+        "properties": {
+          "cents_per_unit": {
+            "title": "Cents Per Unit",
+            "type": "string"
+          },
+          "is_user_set": {
+            "title": "Is User Set",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "integer"
+          },
+          "reward_currency": {
+            "$ref": "#/components/schemas/RewardCurrencySummary"
+          },
+          "reward_currency_id": {
+            "title": "Reward Currency Id",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "reward_currency_id",
+          "reward_currency",
+          "cents_per_unit",
+          "is_user_set",
+          "updated_at"
+        ],
+        "title": "CurrencyValuationSummary",
+        "type": "object"
+      },
+      "CurrencyValuationUpdate": {
+        "description": "Request payload to set or update a profile's currency valuation (0 < v <= 10).",
+        "properties": {
+          "cents_per_unit": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 10.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Estimated USD cents per reward unit (0 < v <= 10).",
+            "title": "Cents Per Unit"
+          }
+        },
+        "required": [
+          "cents_per_unit"
+        ],
+        "title": "CurrencyValuationUpdate",
+        "type": "object"
+      },
+      "EarningRuleSummary": {
+        "description": "Versioned earning rule with source and exclusions.",
+        "properties": {
+          "cap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpendCapSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Code"
+          },
+          "effective_from": {
+            "format": "date",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/RuleExclusionSummary"
+            },
+            "title": "Exclusions",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "merchant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Name"
+          },
+          "min_period_spend_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Period Spend Cents"
+          },
+          "min_transaction_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Transaction Cents"
+          },
+          "multiplier": {
+            "title": "Multiplier",
+            "type": "string"
+          },
+          "post_cap_behavior": {
+            "title": "Post Cap Behavior",
+            "type": "string"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "rounding": {
+            "title": "Rounding",
+            "type": "string"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "scope_type": {
+            "title": "Scope Type",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RuleSourceSummary"
+          },
+          "threshold_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Period"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "rule_key",
+          "version",
+          "scope_type",
+          "multiplier",
+          "priority",
+          "post_cap_behavior",
+          "rounding",
+          "effective_from",
+          "source",
+          "exclusions"
+        ],
+        "title": "EarningRuleSummary",
+        "type": "object"
+      },
+      "GrafanaAlertItem": {
+        "description": "Single alert entry inside a Grafana Alerting webhook notification.",
+        "properties": {
+          "annotations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Annotations",
+            "type": "object"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "object"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "GrafanaAlertItem",
+        "type": "object"
+      },
+      "GrafanaWebhookPayload": {
+        "description": "Standard Grafana Alerting webhook notification payload.",
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/GrafanaAlertItem"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "commonAnnotations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Commonannotations",
+            "type": "object"
+          },
+          "commonLabels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Commonlabels",
+            "type": "object"
+          },
+          "externalURL": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Externalurl"
+          },
+          "receiver": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiver"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "GrafanaWebhookPayload",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MerchantSummary": {
+        "description": "Seeded merchant reference item.",
+        "properties": {
+          "default_category_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Category Code"
+          },
+          "default_category_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Category Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tags"
+        ],
+        "title": "MerchantSummary",
+        "type": "object"
+      },
+      "ProfileCardCreate": {
+        "description": "Request payload to add a catalog card to a profile.",
+        "properties": {
+          "card_product_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Card Product Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "nickname": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Nickname",
+            "type": "string"
+          },
+          "opened_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened On"
+          }
+        },
+        "required": [
+          "card_product_id",
+          "nickname"
+        ],
+        "title": "ProfileCardCreate",
+        "type": "object"
+      },
+      "ProfileCardSummary": {
+        "description": "Card held within a user or demo profile.",
+        "properties": {
+          "card_product": {
+            "$ref": "#/components/schemas/CardProductSummary"
+          },
+          "card_product_id": {
+            "title": "Card Product Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "nickname": {
+            "title": "Nickname",
+            "type": "string"
+          },
+          "opened_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened On"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "profile_id",
+          "card_product_id",
+          "nickname",
+          "is_active",
+          "card_product"
+        ],
+        "title": "ProfileCardSummary",
+        "type": "object"
+      },
+      "ProfileCardUpdate": {
+        "description": "Request payload to update a profile card's nickname, opened date, or active status.",
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nickname"
+          },
+          "opened_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened On"
+          }
+        },
+        "title": "ProfileCardUpdate",
+        "type": "object"
+      },
+      "ProfileResetResponse": {
+        "description": "Response returned after resetting a demo profile to its seeded baseline.",
+        "properties": {
+          "cards_restored": {
+            "title": "Cards Restored",
+            "type": "integer"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileSummary"
+          },
+          "status": {
+            "default": "reset",
+            "title": "Status",
+            "type": "string"
+          },
+          "valuations_restored": {
+            "title": "Valuations Restored",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile",
+          "cards_restored",
+          "valuations_restored"
+        ],
+        "title": "ProfileResetResponse",
+        "type": "object"
+      },
+      "ProfileSummary": {
+        "description": "Public summary of a demo or user profile.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_demo": {
+            "title": "Is Demo",
+            "type": "boolean"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "display_name",
+          "is_demo"
+        ],
+        "title": "ProfileSummary",
+        "type": "object"
+      },
+      "RecommendationRequest": {
+        "description": "Input payload for comparing cards on a purchase.",
+        "properties": {
+          "amount_cents": {
+            "description": "Purchase amount in integer USD cents.",
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "card_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional subset of profile card IDs to evaluate.",
+            "title": "Card Ids"
+          },
+          "category_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Category Code",
+            "type": "string"
+          },
+          "merchant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Id"
+          },
+          "purchase_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Date"
+          }
+        },
+        "required": [
+          "amount_cents",
+          "category_code"
+        ],
+        "title": "RecommendationRequest",
+        "type": "object"
+      },
+      "RecommendationResponse": {
+        "description": "Ranked, unranked, and ineligible cards for a purchase.",
+        "properties": {
+          "engine_version": {
+            "default": "1.0.0",
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "global_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Global Notes",
+            "type": "array"
+          },
+          "ineligible": {
+            "items": {
+              "$ref": "#/components/schemas/CardRecommendationItem"
+            },
+            "title": "Ineligible",
+            "type": "array"
+          },
+          "ranked": {
+            "items": {
+              "$ref": "#/components/schemas/CardRecommendationItem"
+            },
+            "title": "Ranked",
+            "type": "array"
+          },
+          "unranked": {
+            "items": {
+              "$ref": "#/components/schemas/CardRecommendationItem"
+            },
+            "title": "Unranked",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ranked",
+          "unranked",
+          "ineligible",
+          "global_notes"
+        ],
+        "title": "RecommendationResponse",
+        "type": "object"
+      },
+      "RewardCurrencySummary": {
+        "description": "Reward currency metadata.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "default_cents_per_unit": {
+            "title": "Default Cents Per Unit",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_cash_equivalent": {
+            "title": "Is Cash Equivalent",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "is_cash_equivalent",
+          "default_cents_per_unit"
+        ],
+        "title": "RewardCurrencySummary",
+        "type": "object"
+      },
+      "RewardsSummaryResponse": {
+        "description": "Per-currency rewards summary with a separately labeled estimated USD total.",
+        "properties": {
+          "currencies": {
+            "items": {
+              "$ref": "#/components/schemas/CurrencyRewardSummary"
+            },
+            "title": "Currencies",
+            "type": "array"
+          },
+          "estimated_total_label": {
+            "title": "Estimated Total Label",
+            "type": "string"
+          },
+          "estimated_total_usd_cents": {
+            "title": "Estimated Total Usd Cents",
+            "type": "integer"
+          },
+          "excluded_unvalued_currency_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Unvalued Currency Codes",
+            "type": "array"
+          },
+          "limitation_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitation Message"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "integer"
+          },
+          "profile_slug": {
+            "title": "Profile Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "profile_slug",
+          "currencies",
+          "estimated_total_usd_cents",
+          "estimated_total_label",
+          "excluded_unvalued_currency_codes"
+        ],
+        "title": "RewardsSummaryResponse",
+        "type": "object"
+      },
+      "RuleExclusionSummary": {
+        "description": "Exclusion attached to an earning rule.",
+        "properties": {
+          "exclusion_type": {
+            "title": "Exclusion Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "target_category_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Category Code"
+          },
+          "target_merchant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Merchant Name"
+          },
+          "target_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Tag"
+          }
+        },
+        "required": [
+          "id",
+          "exclusion_type",
+          "reason"
+        ],
+        "title": "RuleExclusionSummary",
+        "type": "object"
+      },
+      "RuleSourceSummary": {
+        "description": "Rule or benefit source provenance metadata.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_reviewed_on": {
+            "format": "date",
+            "title": "Last Reviewed On",
+            "type": "string"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "notes",
+          "last_reviewed_on"
+        ],
+        "title": "RuleSourceSummary",
+        "type": "object"
+      },
+      "SpendCapSummary": {
+        "description": "Spend cap metadata for an earning rule.",
+        "properties": {
+          "cap_amount_cents": {
+            "title": "Cap Amount Cents",
+            "type": "integer"
+          },
+          "cap_group_key": {
+            "title": "Cap Group Key",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "cap_group_key",
+          "cap_amount_cents",
+          "period"
+        ],
+        "title": "SpendCapSummary",
+        "type": "object"
+      },
+      "TransactionCreate": {
+        "description": "Request payload to record a purchase transaction and persist its reward snapshot.",
+        "properties": {
+          "amount_cents": {
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "category_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Category Code",
+            "type": "string"
+          },
+          "merchant_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Id"
+          },
+          "merchant_text": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Text"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Note",
+            "type": "string"
+          },
+          "occurred_on": {
+            "format": "date",
+            "title": "Occurred On",
+            "type": "string"
+          },
+          "profile_card_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Profile Card Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_card_id",
+          "amount_cents",
+          "category_code",
+          "occurred_on"
+        ],
+        "title": "TransactionCreate",
+        "type": "object"
+      },
+      "TransactionRewardCalcSummary": {
+        "description": "Immutable calculation snapshot persisted for a transaction.",
+        "properties": {
+          "applied_rule_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Applied Rule Ids",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "estimated_value_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Value Cents"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "reward_currency": {
+            "title": "Reward Currency",
+            "type": "string"
+          },
+          "reward_units": {
+            "title": "Reward Units",
+            "type": "string"
+          },
+          "trace": {
+            "additionalProperties": true,
+            "title": "Trace",
+            "type": "object"
+          },
+          "valuation_cents_per_unit_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Cents Per Unit Used"
+          }
+        },
+        "required": [
+          "id",
+          "engine_version",
+          "reward_currency",
+          "reward_units",
+          "applied_rule_ids",
+          "trace",
+          "created_at"
+        ],
+        "title": "TransactionRewardCalcSummary",
+        "type": "object"
+      },
+      "TransactionSummary": {
+        "description": "Recorded transaction with its immutable reward calculation snapshot.",
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "card_name": {
+            "title": "Card Name",
+            "type": "string"
+          },
+          "category_code": {
+            "title": "Category Code",
+            "type": "string"
+          },
+          "category_name": {
+            "title": "Category Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "merchant_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Id"
+          },
+          "merchant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Name"
+          },
+          "merchant_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Text"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "occurred_on": {
+            "format": "date",
+            "title": "Occurred On",
+            "type": "string"
+          },
+          "profile_card_id": {
+            "title": "Profile Card Id",
+            "type": "integer"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "integer"
+          },
+          "reward_calc": {
+            "$ref": "#/components/schemas/TransactionRewardCalcSummary"
+          }
+        },
+        "required": [
+          "id",
+          "profile_id",
+          "profile_card_id",
+          "card_name",
+          "amount_cents",
+          "category_code",
+          "category_name",
+          "occurred_on",
+          "note",
+          "created_at",
+          "reward_calc"
+        ],
+        "title": "TransactionSummary",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WebhookDispatchResponse": {
+        "description": "Response returned by the Grafana webhook relay endpoint.",
+        "properties": {
+          "alert_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Name"
+          },
+          "alert_status": {
+            "title": "Alert Status",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "dispatched": {
+            "title": "Dispatched",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "dispatched",
+          "alert_status",
+          "detail"
+        ],
+        "title": "WebhookDispatchResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Deterministic, explainable credit card rewards and benefits optimizer API.",
+    "title": "CardPilot",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/card-products": {
+      "get": {
+        "description": "List fictional card products in the catalog.",
+        "operationId": "get_card_products_api_v1_card_products_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardProductSummary"
+                  },
+                  "title": "Response Get Card Products Api V1 Card Products Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Card Products",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/card-products/{card_product_id}/benefits": {
+      "get": {
+        "description": "List benefit definitions and source metadata for a card product.",
+        "operationId": "get_card_product_benefits_api_v1_card_products__card_product_id__benefits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_product_id",
+            "required": true,
+            "schema": {
+              "title": "Card Product Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BenefitDefinitionSummary"
+                  },
+                  "title": "Response Get Card Product Benefits Api V1 Card Products  Card Product Id  Benefits Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Card Product Benefits",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/card-products/{card_product_id}/rules": {
+      "get": {
+        "description": "List earning rules and source metadata for a card product.",
+        "operationId": "get_card_product_rules_api_v1_card_products__card_product_id__rules_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_product_id",
+            "required": true,
+            "schema": {
+              "title": "Card Product Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EarningRuleSummary"
+                  },
+                  "title": "Response Get Card Product Rules Api V1 Card Products  Card Product Id  Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Card Product Rules",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "description": "List spending categories.",
+        "operationId": "get_categories_api_v1_categories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategorySummary"
+                  },
+                  "title": "Response Get Categories Api V1 Categories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Categories",
+        "tags": [
+          "recommendations"
+        ]
+      }
+    },
+    "/api/v1/merchants": {
+      "get": {
+        "description": "List seeded merchants.",
+        "operationId": "get_merchants_api_v1_merchants_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MerchantSummary"
+                  },
+                  "title": "Response Get Merchants Api V1 Merchants Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Merchants",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/profiles": {
+      "get": {
+        "description": "List available demo/user profiles.",
+        "operationId": "get_profiles_api_v1_profiles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileSummary"
+                  },
+                  "title": "Response Get Profiles Api V1 Profiles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Profiles",
+        "tags": [
+          "recommendations"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}": {
+      "get": {
+        "description": "Retrieve a single profile by slug or ID.",
+        "operationId": "get_profile_by_key_api_v1_profiles__profile_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile By Key",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/benefits": {
+      "get": {
+        "description": "Return current-period benefit status for all active cards in a profile.",
+        "operationId": "get_profile_benefits_api_v1_profiles__profile_key__benefits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "as_of_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BenefitStatusItem"
+                  },
+                  "title": "Response Get Profile Benefits Api V1 Profiles  Profile Key  Benefits Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile Benefits",
+        "tags": [
+          "benefits"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/benefits/{benefit_id}/usages": {
+      "post": {
+        "description": "Log a benefit usage entry for a profile card.",
+        "operationId": "post_benefit_usage_api_v1_profiles__profile_key__benefits__benefit_id__usages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "benefit_id",
+            "required": true,
+            "schema": {
+              "title": "Benefit Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BenefitUsageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenefitUsageSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Benefit Usage",
+        "tags": [
+          "benefits"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/benefits/{benefit_id}/usages/{usage_id}": {
+      "delete": {
+        "description": "Delete a logged benefit usage entry.",
+        "operationId": "delete_benefit_usage_route_api_v1_profiles__profile_key__benefits__benefit_id__usages__usage_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "benefit_id",
+            "required": true,
+            "schema": {
+              "title": "Benefit Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "usage_id",
+            "required": true,
+            "schema": {
+              "title": "Usage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Benefit Usage Route",
+        "tags": [
+          "benefits"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/cards": {
+      "get": {
+        "description": "List cards held by a profile.",
+        "operationId": "get_profile_cards_api_v1_profiles__profile_key__cards_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileCardSummary"
+                  },
+                  "title": "Response Get Profile Cards Api V1 Profiles  Profile Key  Cards Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile Cards",
+        "tags": [
+          "catalog"
+        ]
+      },
+      "post": {
+        "description": "Add a card from the catalog to a profile.",
+        "operationId": "post_profile_card_api_v1_profiles__profile_key__cards_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileCardCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCardSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Profile Card",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/cards/{card_id}": {
+      "delete": {
+        "description": "Remove a card from a profile.",
+        "operationId": "delete_profile_card_route_api_v1_profiles__profile_key__cards__card_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "title": "Card Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Profile Card Route",
+        "tags": [
+          "catalog"
+        ]
+      },
+      "patch": {
+        "description": "Update a card belonging to a profile.",
+        "operationId": "patch_profile_card_api_v1_profiles__profile_key__cards__card_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "title": "Card Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileCardUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCardSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Profile Card",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/recommendations": {
+      "post": {
+        "description": "Evaluate all active cards for a profile and return ranked recommendations.",
+        "operationId": "post_recommendations_api_v1_profiles__profile_key__recommendations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Recommendations",
+        "tags": [
+          "recommendations"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/reset": {
+      "post": {
+        "description": "Reset a demo profile and its associated state back to seeded defaults.",
+        "operationId": "post_profile_reset_api_v1_profiles__profile_key__reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Profile Reset",
+        "tags": [
+          "recommendations"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/rewards/summary": {
+      "get": {
+        "description": "Return accumulated reward units per currency and a separate estimated USD total.",
+        "operationId": "get_profile_rewards_summary_api_v1_profiles__profile_key__rewards_summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewardsSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile Rewards Summary",
+        "tags": [
+          "rewards"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/transactions": {
+      "get": {
+        "description": "List recorded transactions for a profile with optional filters.",
+        "operationId": "get_profile_transactions_api_v1_profiles__profile_key__transactions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "profile_card_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Card Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category_code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TransactionSummary"
+                  },
+                  "title": "Response Get Profile Transactions Api V1 Profiles  Profile Key  Transactions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile Transactions",
+        "tags": [
+          "transactions"
+        ]
+      },
+      "post": {
+        "description": "Record a transaction and persist an immutable reward calculation snapshot.",
+        "operationId": "post_profile_transaction_api_v1_profiles__profile_key__transactions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Profile Transaction",
+        "tags": [
+          "transactions"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/transactions/{transaction_id}": {
+      "delete": {
+        "description": "Delete a recorded transaction and its calculation snapshot.",
+        "operationId": "delete_profile_transaction_api_v1_profiles__profile_key__transactions__transaction_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "title": "Transaction Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Profile Transaction",
+        "tags": [
+          "transactions"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/valuations": {
+      "get": {
+        "description": "List currency valuations configured for a profile.",
+        "operationId": "get_profile_valuations_api_v1_profiles__profile_key__valuations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CurrencyValuationSummary"
+                  },
+                  "title": "Response Get Profile Valuations Api V1 Profiles  Profile Key  Valuations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile Valuations",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/profiles/{profile_key}/valuations/{currency_key}": {
+      "put": {
+        "description": "Create or update a profile's valuation for a reward currency.",
+        "operationId": "put_profile_valuation_api_v1_profiles__profile_key__valuations__currency_key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "currency_key",
+            "required": true,
+            "schema": {
+              "title": "Currency Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CurrencyValuationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrencyValuationSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Profile Valuation",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/reward-currencies": {
+      "get": {
+        "description": "List reward currencies.",
+        "operationId": "get_reward_currencies_api_v1_reward_currencies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RewardCurrencySummary"
+                  },
+                  "title": "Response Get Reward Currencies Api V1 Reward Currencies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Reward Currencies",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/webhooks/grafana-alert": {
+      "post": {
+        "description": "Receive a Grafana webhook notification and forward firing alerts to GitHub.",
+        "operationId": "post_grafana_alert_api_v1_webhooks_grafana_alert_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrafanaWebhookPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDispatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Grafana Alert",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "description": "Liveness health check endpoint.",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Healthz Healthz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness probe",
+        "tags": [
+          "meta"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "description": "Readiness health check endpoint verifying database connectivity.",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Readyz Readyz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness probe",
+        "tags": [
+          "meta"
+        ]
+      }
+    }
+  }
+}

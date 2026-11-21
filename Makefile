@@ -77,7 +77,13 @@ seed:
 
 .PHONY: openapi
 openapi:
-	@echo "OpenAPI export not yet implemented (T36)."
+	uv run --directory backend python scripts/export_openapi.py
+	npm --prefix frontend run openapi:types
+
+.PHONY: openapi-check
+openapi-check:
+	uv run --directory backend python scripts/export_openapi.py --check
+	npm --prefix frontend run openapi:check
 
 # ── E2E ───────────────────────────────────────────────────────────────────────
 .PHONY: e2e
