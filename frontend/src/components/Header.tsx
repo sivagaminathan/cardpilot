@@ -1,116 +1,165 @@
-import React from 'react';
-import { DEMO_PROFILES } from '../types/profile';
+import React, { useState } from 'react';
+import { NavLink } from 'react-router-dom';
+import type { ProfileSummary } from '../api/client';
 import { BackendStatus } from './BackendStatus';
 
+interface NavRoute {
+  to: string;
+  label: string;
+  end?: boolean;
+}
+
+const NAV_ROUTES: NavRoute[] = [
+  { to: '/', label: 'Dashboard', end: true },
+  { to: '/cards', label: 'Cards' },
+  { to: '/compare', label: 'Compare' },
+  { to: '/transactions', label: 'Transactions' },
+  { to: '/benefits', label: 'Benefits' },
+  { to: '/rewards', label: 'Rewards' },
+  { to: '/settings', label: 'Settings' },
+  { to: '/rules', label: 'Rules' },
+];
+
+export interface ResetFeedback {
+  kind: 'success' | 'error';
+  message: string;
+}
+
 interface HeaderProps {
-  currentProfileId: string;
-  onSelectProfile: (profileId: string) => void;
-  activeTab: string;
-  onSelectTab: (tab: string) => void;
+  profiles: ProfileSummary[];
+  isLoadingProfiles: boolean;
+  profilesError: string | null;
+  onRetryProfiles: () => void;
+  currentProfileKey: string;
+  onSelectProfile: (profileSlug: string) => void;
+  onResetProfile: () => void;
+  isResetting: boolean;
+  resetFeedback: ResetFeedback | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  currentProfileId,
+  profiles,
+  isLoadingProfiles,
+  profilesError,
+  onRetryProfiles,
+  currentProfileKey,
   onSelectProfile,
-  activeTab,
-  onSelectTab,
+  onResetProfile,
+  isResetting,
+  resetFeedback,
 }) => {
-  const currentProfile = DEMO_PROFILES.find((p) => p.id === currentProfileId) ?? DEMO_PROFILES[0];
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
+  const handleConfirmReset = (): void => {
+    setConfirmingReset(false);
+    onResetProfile();
+  };
 
   return (
     <header className="app-header">
       <div className="header-top">
         <div className="brand">
-          <span className="brand-icon" aria-hidden="true">💳</span>
+          <span className="brand-icon" aria-hidden="true">
+            💳
+          </span>
           <h1 className="brand-title">CardPilot</h1>
           <span className="version-tag">v0.1.0</span>
           <BackendStatus />
         </div>
 
         <div className="profile-selector-container">
-          <label htmlFor="profile-select" className="profile-label">
-            Demo Profile:
-          </label>
-          <select
-            id="profile-select"
-            className="profile-select"
-            value={currentProfileId}
-            onChange={(e) => onSelectProfile(e.target.value)}
-            aria-label="Select demo profile"
-          >
-            {DEMO_PROFILES.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name} — {profile.role}
-              </option>
-            ))}
-          </select>
+          {isLoadingProfiles ? (
+            <span className="profile-status-text" role="status">
+              Loading profiles...
+            </span>
+          ) : profilesError ? (
+            <div className="profile-error-group" role="alert">
+              <span className="profile-error-text">{profilesError}</span>
+              <button type="button" className="btn btn-secondary" onClick={onRetryProfiles}>
+                Retry
+              </button>
+            </div>
+          ) : profiles.length === 0 ? (
+            <span className="profile-status-text" role="status">
+              No profiles available
+            </span>
+          ) : (
+            <>
+              <label htmlFor="profile-select" className="profile-label">
+                Demo Profile:
+              </label>
+              <select
+                id="profile-select"
+                className="profile-select"
+                value={currentProfileKey}
+                onChange={(e) => {
+                  setConfirmingReset(false);
+                  onSelectProfile(e.target.value);
+                }}
+                aria-label="Select demo profile"
+              >
+                {profiles.map((profile) => (
+                  <option key={profile.id} value={profile.slug}>
+                    {profile.display_name}
+                  </option>
+                ))}
+              </select>
+
+              {!confirmingReset ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={!currentProfileKey || isResetting}
+                  onClick={() => setConfirmingReset(true)}
+                >
+                  {isResetting ? 'Resetting...' : 'Reset Demo Data'}
+                </button>
+              ) : (
+                <div className="reset-confirm-group" role="group" aria-label="Confirm demo reset">
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    disabled={isResetting}
+                    onClick={handleConfirmReset}
+                  >
+                    Confirm Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={isResetting}
+                    onClick={() => setConfirmingReset(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {resetFeedback && (
+            <span
+              className={`reset-feedback reset-feedback--${resetFeedback.kind}`}
+              role={resetFeedback.kind === 'error' ? 'alert' : 'status'}
+            >
+              {resetFeedback.message}
+            </span>
+          )}
         </div>
       </div>
 
       <nav className="main-nav" aria-label="Main Navigation">
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => onSelectTab('dashboard')}
-          aria-current={activeTab === 'dashboard' ? 'page' : undefined}
-        >
-          Dashboard
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'cards' ? 'active' : ''}`}
-          onClick={() => onSelectTab('cards')}
-          aria-current={activeTab === 'cards' ? 'page' : undefined}
-        >
-          Cards
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'compare' ? 'active' : ''}`}
-          onClick={() => onSelectTab('compare')}
-          aria-current={activeTab === 'compare' ? 'page' : undefined}
-        >
-          Compare
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'transactions' ? 'active' : ''}`}
-          onClick={() => onSelectTab('transactions')}
-          aria-current={activeTab === 'transactions' ? 'page' : undefined}
-        >
-          Transactions
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'benefits' ? 'active' : ''}`}
-          onClick={() => onSelectTab('benefits')}
-          aria-current={activeTab === 'benefits' ? 'page' : undefined}
-        >
-          Benefits
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'rewards' ? 'active' : ''}`}
-          onClick={() => onSelectTab('rewards')}
-          aria-current={activeTab === 'rewards' ? 'page' : undefined}
-        >
-          Rewards
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => onSelectTab('settings')}
-          aria-current={activeTab === 'settings' ? 'page' : undefined}
-        >
-          Settings
-        </button>
+        {NAV_ROUTES.map((route) => (
+          <NavLink
+            key={route.to}
+            to={route.to}
+            end={route.end}
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            {route.label}
+          </NavLink>
+        ))}
       </nav>
-
-      <div className="profile-banner">
-        <div className="profile-info">
-          <strong>Active Profile: {currentProfile.name}</strong> ({currentProfile.role}) — {currentProfile.description}
-        </div>
-      </div>
     </header>
   );
 };
