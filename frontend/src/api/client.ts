@@ -2,7 +2,11 @@ import type { components } from '../types/api.generated';
 
 export type ProfileSummary = components['schemas']['ProfileSummary'];
 export type ProfileResetResponse = components['schemas']['ProfileResetResponse'];
+export type CardProductSummary = components['schemas']['CardProductSummary'];
+export type EarningRuleSummary = components['schemas']['EarningRuleSummary'];
+export type ProfileCardCreate = components['schemas']['ProfileCardCreate'];
 export type ProfileCardSummary = components['schemas']['ProfileCardSummary'];
+export type ProfileCardUpdate = components['schemas']['ProfileCardUpdate'];
 export type BenefitStatusItem = components['schemas']['BenefitStatusItem'];
 export type RewardsSummaryResponse = components['schemas']['RewardsSummaryResponse'];
 
@@ -166,6 +170,64 @@ export async function fetchRewardsSummary(
   return apiRequest<RewardsSummaryResponse>(
     `/profiles/${encodeURIComponent(profileKey)}/rewards/summary`,
     { method: 'GET' },
+    baseUrl,
+  );
+}
+
+export async function fetchCardProducts(baseUrl?: string): Promise<CardProductSummary[]> {
+  return apiRequest<CardProductSummary[]>('/card-products', { method: 'GET' }, baseUrl);
+}
+
+export async function fetchCardProductRules(
+  cardProductId: number,
+  baseUrl?: string,
+): Promise<EarningRuleSummary[]> {
+  return apiRequest<EarningRuleSummary[]>(
+    `/card-products/${encodeURIComponent(String(cardProductId))}/rules`,
+    { method: 'GET' },
+    baseUrl,
+  );
+}
+
+export async function addProfileCard(
+  profileKey: string,
+  payload: ProfileCardCreate,
+  baseUrl?: string,
+): Promise<ProfileCardSummary> {
+  return apiRequest<ProfileCardSummary>(
+    `/profiles/${encodeURIComponent(profileKey)}/cards`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    baseUrl,
+  );
+}
+
+export async function updateProfileCard(
+  profileKey: string,
+  cardId: number,
+  payload: ProfileCardUpdate,
+  baseUrl?: string,
+): Promise<ProfileCardSummary> {
+  return apiRequest<ProfileCardSummary>(
+    `/profiles/${encodeURIComponent(profileKey)}/cards/${encodeURIComponent(String(cardId))}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+    baseUrl,
+  );
+}
+
+export async function deleteProfileCard(
+  profileKey: string,
+  cardId: number,
+  baseUrl?: string,
+): Promise<void> {
+  return apiRequest<void>(
+    `/profiles/${encodeURIComponent(profileKey)}/cards/${encodeURIComponent(String(cardId))}`,
+    { method: 'DELETE' },
     baseUrl,
   );
 }

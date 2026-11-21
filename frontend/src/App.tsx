@@ -8,10 +8,12 @@ import {
 } from '@tanstack/react-query';
 import { Link, MemoryRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { ApiError, fetchProfiles, resetProfile } from './api/client';
+import { CardsView } from './components/CardsView';
 import { CompareView } from './components/CompareView';
 import { Dashboard } from './components/Dashboard';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { Header, type ResetFeedback } from './components/Header';
+import { RulesView } from './components/RulesView';
 
 interface PlaceholderPageProps {
   title: string;
@@ -28,7 +30,11 @@ const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, description })
   </section>
 );
 
-export const AppShell: React.FC = () => {
+interface AppShellProps {
+  rulesReferenceDate?: Date | string;
+}
+
+export const AppShell: React.FC<AppShellProps> = ({ rulesReferenceDate }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedProfileKey, setSelectedProfileKey] = useState<string>('');
@@ -110,15 +116,7 @@ export const AppShell: React.FC = () => {
               />
             }
           />
-          <Route
-            path="/cards"
-            element={
-              <PlaceholderPage
-                title="Cards View"
-                description="Card portfolio management and rules viewer are scheduled for T39."
-              />
-            }
-          />
+          <Route path="/cards" element={<CardsView profileId={activeProfileKey} />} />
           <Route path="/compare" element={<CompareView profileId={activeProfileKey || 'maya'} />} />
           <Route
             path="/transactions"
@@ -156,15 +154,7 @@ export const AppShell: React.FC = () => {
               />
             }
           />
-          <Route
-            path="/rules"
-            element={
-              <PlaceholderPage
-                title="Rules View"
-                description="Earning rules, sources, and staleness viewer are scheduled for T39."
-              />
-            }
-          />
+          <Route path="/rules" element={<RulesView referenceDate={rulesReferenceDate} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -189,13 +179,16 @@ function createAppQueryClient(): QueryClient {
   });
 }
 
-export const App: React.FC<{ initialEntries?: string[] }> = ({ initialEntries }) => {
+export const App: React.FC<{
+  initialEntries?: string[];
+  rulesReferenceDate?: Date | string;
+}> = ({ initialEntries, rulesReferenceDate }) => {
   const [queryClient] = useState(createAppQueryClient);
 
   return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={initialEntries}>
-        <AppShell />
+        <AppShell rulesReferenceDate={rulesReferenceDate} />
       </MemoryRouter>
     </QueryClientProvider>
   );

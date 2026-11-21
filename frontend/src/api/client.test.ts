@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
+  addProfileCard,
+  deleteProfileCard,
+  fetchCardProductRules,
+  fetchCardProducts,
   fetchProfileBenefits,
   fetchProfileCards,
   fetchProfiles,
   fetchRewardsSummary,
   getApiBaseUrl,
   resetProfile,
+  updateProfileCard,
 } from './client';
 
 describe('API client', () => {
@@ -168,6 +173,142 @@ describe('API client', () => {
       name: 'ApiError',
       status: 404,
       detail: 'Profile not found',
+    });
+  });
+
+  it('fetches catalog products and rules, manages profile cards, handles 204, and surfaces 409/422 errors', async () => {
+    const deleteJsonSpy = vi.fn(async () => {
+      throw new Error('should not parse 204 body');
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 1, name: 'Northwind Cash Everyday' }],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 10, rule_key: 'nwcash.dining', multiplier: '3.0' }],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ id: 105, nickname: 'New Cash', is_active: true }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 105, nickname: 'New Cash', is_active: false }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: deleteJsonSpy,
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          title: 'Conflict',
+          status: 409,
+          detail: "Profile already holds 'New Cash' for this card product.",
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          title: 'Unprocessable Entity',
+          status: 422,
+          detail: 'Validation failed.',
+          errors: [
+            {
+              loc: ['body', 'nickname'],
+              msg: 'Value must not contain 13-19 digit card numbers.',
+              type: 'value_error',
+            },
+          ],
+        }),
+      } as Response);
+
+    const products = await fetchCardProducts('https://api.cardpilot.demo');
+    expect(products).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://api.cardpilot.demo/api/v1/card-products',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const rules = await fetchCardProductRules(1, 'https://api.cardpilot.demo');
+    expect(rules).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://api.cardpilot.demo/api/v1/card-products/1/rules',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const created = await addProfileCard(
+      'maya/1',
+      { card_product_id: 1, nickname: 'New Cash', opened_on: '2026-01-15', is_active: true },
+      'https://api.cardpilot.demo',
+    );
+    expect(created.id).toBe(105);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/cards',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          card_product_id: 1,
+          nickname: 'New Cash',
+          opened_on: '2026-01-15',
+          is_active: true,
+        }),
+      }),
+    );
+
+    const updated = await updateProfileCard('maya/1', 105, { is_active: false });
+    expect(updated.is_active).toBe(false);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      4,
+      '/api/v1/profiles/maya%2F1/cards/105',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: false }),
+      }),
+    );
+
+    await expect(deleteProfileCard('maya/1', 105)).resolves.toBeUndefined();
+    expect(deleteJsonSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      5,
+      '/api/v1/profiles/maya%2F1/cards/105',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+
+    await expect(
+      addProfileCard('maya', { card_product_id: 1, nickname: 'New Cash', is_active: true }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 409,
+      detail: "Profile already holds 'New Cash' for this card product.",
+    });
+
+    await expect(
+      addProfileCard('maya', { card_product_id: 1, nickname: '4111111111111111', is_active: true }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      errors: [
+        {
+          loc: ['body', 'nickname'],
+          msg: 'Value must not contain 13-19 digit card numbers.',
+          type: 'value_error',
+        },
+      ],
     });
   });
 });

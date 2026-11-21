@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { App } from './App';
 import { BackendStatus, getHealthUrl } from './components/BackendStatus';
 import { formatCentsToUsd } from './lib/formatters';
+import { getRuleStaleness } from './lib/rules';
 
 const MOCK_PROFILES = [
   { id: 1, slug: 'maya', display_name: 'Maya — The Optimizer', is_demo: true },
@@ -584,7 +585,9 @@ describe('CardPilot App Shell, Dashboard, Router, and Profile Picker', () => {
     await screen.findByRole('heading', { level: 4, name: 'Daily Cash' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage Cards' }));
-    expect(screen.getByRole('heading', { level: 2, name: /Cards View/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Add Card from Fictional Catalog/i }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: /^Dashboard$/i }));
     fireEvent.click(screen.getByRole('button', { name: 'View All Benefits' }));
@@ -600,7 +603,9 @@ describe('CardPilot App Shell, Dashboard, Router, and Profile Picker', () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: /^Rules$/i }));
-    expect(screen.getByRole('heading', { level: 2, name: /Rules View/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Earning Rules & Source Provenance/i }),
+    ).toBeInTheDocument();
 
     const banner = screen.getByRole('complementary', { name: /Demo Disclaimer/i });
     expect(
@@ -662,5 +667,893 @@ describe('BackendStatus component', () => {
     await waitFor(() => {
       expect(screen.getByText('API Offline')).toBeInTheDocument();
     });
+  });
+});
+
+const MOCK_CATALOG_PRODUCTS = [
+  {
+    id: 1,
+    issuer_name: 'Northwind Bank',
+    name: 'Northwind Cash Everyday',
+    annual_fee_cents: 0,
+    network_label: 'Visa',
+    description: 'Everyday cash back card',
+    reward_currency: {
+      id: 1,
+      code: 'NW_CASH',
+      name: 'Northwind Cash',
+      kind: 'cash_back',
+      is_cash_equivalent: true,
+    },
+  },
+  {
+    id: 2,
+    issuer_name: 'Skyward Financial',
+    name: 'Skyward Miles Explorer',
+    annual_fee_cents: 9500,
+    network_label: 'Mastercard',
+    description: 'Travel miles card',
+    reward_currency: {
+      id: 3,
+      code: 'SKY_MILES',
+      name: 'Skyward Miles',
+      kind: 'miles',
+      is_cash_equivalent: false,
+    },
+  },
+  {
+    id: 3,
+    issuer_name: 'Horizon Bancorp',
+    name: 'Horizon Summit Points',
+    annual_fee_cents: 25000,
+    network_label: 'Visa',
+    description: 'Unheld by Maya catalog card',
+    reward_currency: {
+      id: 4,
+      code: 'HORIZON_PTS',
+      name: 'Horizon Points',
+      kind: 'points',
+      is_cash_equivalent: false,
+    },
+  },
+];
+
+// Reference date in tests: 2026-11-20
+// 179 days before 2026-11-20 = 2026-05-25
+// 180 days before 2026-11-20 = 2026-05-24
+// 181 days before 2026-11-20 = 2026-05-23
+const MOCK_PRODUCT_RULES: Record<number, unknown[]> = {
+  1: [
+    {
+      id: 11,
+      rule_key: 'nwcash.dining',
+      version: 1,
+      scope_type: 'category',
+      category_code: 'DINING',
+      merchant_name: null,
+      multiplier: '3.0',
+      priority: 10,
+      rounding: 'nearest_cent',
+      effective_from: '2026-01-01',
+      effective_to: '2026-12-31',
+      min_transaction_cents: 1000,
+      min_period_spend_cents: null,
+      threshold_period: null,
+      post_cap_behavior: 'fallback_base',
+      cap: {
+        id: 1,
+        cap_group_key: 'nwcash_dining_q',
+        cap_amount_cents: 50000,
+        period: 'quarterly',
+      },
+      exclusions: [
+        {
+          id: 1,
+          exclusion_type: 'merchant_tag',
+          target_category_code: null,
+          target_merchant_name: null,
+          target_tag: 'bakery_cafe',
+          reason: 'Standalone bakeries excluded',
+        },
+      ],
+      source: {
+        id: 1,
+        title: 'Northwind Sample Terms v1',
+        kind: 'fictional_sample',
+        url: 'https://example.invalid/northwind-terms',
+        notes: 'Fictional dining rule',
+        last_reviewed_on: '2026-05-24', // Exactly 180 days -> Fresh
+      },
+    },
+    {
+      id: 12,
+      rule_key: 'nwcash.base',
+      version: 1,
+      scope_type: 'base',
+      category_code: null,
+      merchant_name: null,
+      multiplier: '1.0',
+      priority: 1,
+      rounding: 'floor',
+      effective_from: '2026-01-01',
+      effective_to: null,
+      min_transaction_cents: null,
+      min_period_spend_cents: null,
+      threshold_period: null,
+      post_cap_behavior: 'none',
+      cap: null,
+      exclusions: [],
+      source: {
+        id: 2,
+        title: 'Northwind Legacy Archive',
+        kind: 'fictional_sample',
+        url: null,
+        notes: '',
+        last_reviewed_on: '2026-05-23', // 181 days -> Stale
+      },
+    },
+  ],
+  3: [
+    {
+      id: 31,
+      rule_key: 'horizon.travel',
+      version: 2,
+      scope_type: 'category',
+      category_code: 'TRAVEL',
+      merchant_name: null,
+      multiplier: '4.0',
+      priority: 20,
+      rounding: 'nearest_unit',
+      effective_from: '2026-07-01',
+      effective_to: null,
+      min_transaction_cents: null,
+      min_period_spend_cents: null,
+      threshold_period: null,
+      post_cap_behavior: 'none',
+      cap: null,
+      exclusions: [],
+      source: {
+        id: 3,
+        title: 'Horizon Travel Guide',
+        kind: 'public_doc_example',
+        url: null,
+        notes: 'Unheld catalog product rule',
+        last_reviewed_on: '2026-05-25', // 179 days -> Fresh
+      },
+    },
+  ],
+};
+
+function mockT39Fetch(options?: {
+  catalogOk?: boolean;
+  emptyCatalog?: boolean;
+  cardsOk?: boolean;
+  rulesOk?: boolean;
+  emptyRules?: boolean;
+  deleteOk?: boolean;
+  addStatus?: number;
+}) {
+  const catalogOk = options?.catalogOk ?? true;
+  const emptyCatalog = options?.emptyCatalog ?? false;
+  const cardsOk = options?.cardsOk ?? true;
+  const rulesOk = options?.rulesOk ?? true;
+  const emptyRules = options?.emptyRules ?? false;
+  const deleteOk = options?.deleteOk ?? true;
+  const addStatus = options?.addStatus ?? 201;
+
+  const cardsByProfile: Record<string, Array<Record<string, unknown>>> = {
+    maya: JSON.parse(JSON.stringify(MOCK_CARDS.maya)),
+    dev: JSON.parse(JSON.stringify(MOCK_CARDS.dev)),
+  };
+  let nextCardId = 300;
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? 'GET';
+
+    if (url.endsWith('/healthz')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', version: '0.1.0' }),
+      } as Response;
+    }
+
+    if (url.endsWith('/profiles') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+    }
+
+    if (url.endsWith('/card-products') && method === 'GET') {
+      if (!catalogOk) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ title: 'Service Unavailable', status: 503, detail: 'Catalog down' }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => (emptyCatalog ? [] : MOCK_CATALOG_PRODUCTS),
+      } as Response;
+    }
+
+    const rulesMatch = url.match(/\/card-products\/(\d+)\/rules$/);
+    if (rulesMatch && method === 'GET') {
+      if (!rulesOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Internal Error', status: 500, detail: 'Rules failed' }),
+        } as Response;
+      }
+      const productId = Number(rulesMatch[1]);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => (emptyRules ? [] : (MOCK_PRODUCT_RULES[productId] ?? [])),
+      } as Response;
+    }
+
+    const cardsCollectionMatch = url.match(/\/profiles\/([^/]+)\/cards$/);
+    if (cardsCollectionMatch) {
+      const slug = decodeURIComponent(cardsCollectionMatch[1]);
+      if (method === 'GET') {
+        if (!cardsOk) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Internal Error', status: 500, detail: 'Cards failed' }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => cardsByProfile[slug] ?? [],
+        } as Response;
+      }
+
+      if (method === 'POST') {
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          card_product_id: number;
+          nickname: string;
+          opened_on?: string | null;
+          is_active: boolean;
+        };
+        if (addStatus === 409) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              title: 'Conflict',
+              status: 409,
+              detail: `Profile already holds '${body.nickname}' for this card product.`,
+            }),
+          } as Response;
+        }
+        if (addStatus === 422) {
+          return {
+            ok: false,
+            status: 422,
+            json: async () => ({
+              title: 'Unprocessable Entity',
+              status: 422,
+              detail: 'Validation failed.',
+              errors: [
+                {
+                  loc: ['body', 'nickname'],
+                  msg: 'Value must not contain 13-19 digit card numbers.',
+                  type: 'value_error',
+                },
+              ],
+            }),
+          } as Response;
+        }
+        const product =
+          MOCK_CATALOG_PRODUCTS.find((p) => p.id === body.card_product_id) ??
+          MOCK_CATALOG_PRODUCTS[0];
+        const created = {
+          id: nextCardId++,
+          profile_id: slug === 'maya' ? 1 : 2,
+          card_product_id: product.id,
+          nickname: body.nickname,
+          opened_on: body.opened_on ?? null,
+          is_active: body.is_active,
+          card_product: product,
+        };
+        cardsByProfile[slug] = [...(cardsByProfile[slug] ?? []), created];
+        return { ok: true, status: 201, json: async () => created } as Response;
+      }
+    }
+
+    const cardItemMatch = url.match(/\/profiles\/([^/]+)\/cards\/(\d+)$/);
+    if (cardItemMatch) {
+      const slug = decodeURIComponent(cardItemMatch[1]);
+      const cardId = Number(cardItemMatch[2]);
+      if (method === 'PATCH') {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { is_active?: boolean };
+        const list = cardsByProfile[slug] ?? [];
+        const target = list.find((c) => c.id === cardId);
+        if (!target) {
+          return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+        }
+        if (typeof body.is_active === 'boolean') {
+          target.is_active = body.is_active;
+        }
+        return { ok: true, status: 200, json: async () => target } as Response;
+      }
+      if (method === 'DELETE') {
+        if (!deleteOk) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              title: 'Conflict',
+              status: 409,
+              detail: 'Cannot remove card with existing transactions.',
+            }),
+          } as Response;
+        }
+        cardsByProfile[slug] = (cardsByProfile[slug] ?? []).filter((c) => c.id !== cardId);
+        return { ok: true, status: 204 } as Response;
+      }
+    }
+
+    return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+  });
+}
+
+describe('T39 Cards and Rules views', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('computes rule staleness deterministically at 179, 180, and 181 calendar days', () => {
+    expect(getRuleStaleness('2026-05-25', '2026-11-20')).toEqual({
+      ageDays: 179,
+      isStale: false,
+      thresholdDays: 180,
+    });
+    expect(getRuleStaleness('2026-05-24', '2026-11-20')).toEqual({
+      ageDays: 180,
+      isStale: false,
+      thresholdDays: 180,
+    });
+    expect(getRuleStaleness('2026-05-23', '2026-11-20')).toEqual({
+      ageDays: 181,
+      isStale: true,
+      thresholdDays: 180,
+    });
+  });
+
+  it('renders catalog and held cards, adds a card, and validates blank nickname client-side', async () => {
+    const fetchSpy = mockT39Fetch();
+    render(<App initialEntries={['/cards']} />);
+
+    expect(await screen.findByText('Daily Cash')).toBeInTheDocument();
+    expect(screen.getByText('Status: Active')).toBeInTheDocument();
+    expect(screen.getByText('Status: Inactive')).toBeInTheDocument();
+
+    const nicknameInput = screen.getByLabelText('Card Nickname');
+    expect(nicknameInput).toHaveAttribute('aria-describedby', 'card-nickname-safety-hint');
+    expect(
+      screen.getByText('Do not enter real card numbers or sensitive data.'),
+    ).toBeInTheDocument();
+
+    // Blank nickname -> client-side validation, no POST
+    fireEvent.change(nicknameInput, { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nickname is required and must not be blank.',
+    );
+    expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+
+    // Valid add
+    fireEvent.change(screen.getByLabelText('Catalog Card Product'), { target: { value: '3' } });
+    fireEvent.change(nicknameInput, { target: { value: 'Weekend Travel' } });
+    fireEvent.change(screen.getByLabelText('Opened Date (optional)'), {
+      target: { value: '2026-02-01' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+
+    expect(await screen.findByText('Weekend Travel')).toBeInTheDocument();
+    expect(screen.getByText('Opened: 2026-02-01')).toBeInTheDocument();
+    expect(screen.getByText(/Added "Weekend Travel"/)).toBeInTheDocument();
+  });
+
+  it('surfaces 409 duplicate and 422 validation errors from add card', async () => {
+    mockT39Fetch({ addStatus: 409 });
+    const { unmount } = render(<App initialEntries={['/cards']} />);
+    await screen.findByText('Daily Cash');
+
+    fireEvent.change(screen.getByLabelText('Card Nickname'), { target: { value: 'Daily Cash' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Profile already holds 'Daily Cash' for this card product.",
+    );
+    unmount();
+
+    mockT39Fetch({ addStatus: 422 });
+    render(<App initialEntries={['/cards']} />);
+    await screen.findByText('Daily Cash');
+
+    fireEvent.change(screen.getByLabelText('Card Nickname'), {
+      target: { value: '4111111111111111' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Value must not contain 13-19 digit card numbers.',
+    );
+  });
+
+  it('activates/deactivates cards and handles delete confirmation, success, and failure', async () => {
+    mockT39Fetch({ deleteOk: true });
+    const { unmount } = render(<App initialEntries={['/cards']} />);
+    await screen.findByText('Daily Cash');
+
+    const firstCard = screen.getAllByTestId('held-card-item')[0];
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Deactivate' }));
+    await waitFor(() => {
+      expect(within(firstCard).getByText('Status: Inactive')).toBeInTheDocument();
+    });
+
+    // Delete with confirmation
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Remove' }));
+    expect(
+      within(firstCard).getByRole('group', { name: 'Confirm removal of Daily Cash' }),
+    ).toBeInTheDocument();
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Confirm Remove' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Daily Cash')).not.toBeInTheDocument();
+    });
+    unmount();
+
+    // Failed delete preserves card and shows API error
+    mockT39Fetch({ deleteOk: false });
+    render(<App initialEntries={['/cards']} />);
+    await screen.findByText('Daily Cash');
+
+    const cardItem = screen.getAllByTestId('held-card-item')[0];
+    fireEvent.click(within(cardItem).getByRole('button', { name: 'Remove' }));
+    fireEvent.click(within(cardItem).getByRole('button', { name: 'Confirm Remove' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Cannot remove card with existing transactions.',
+    );
+    expect(screen.getByText('Daily Cash')).toBeInTheDocument();
+  });
+
+  it('isolates profile cards and clears transient feedback when switching profiles', async () => {
+    mockT39Fetch();
+    render(<App initialEntries={['/cards']} />);
+
+    await screen.findByText('Daily Cash');
+    const firstCard = screen.getAllByTestId('held-card-item')[0];
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Deactivate' }));
+    expect(await screen.findByText('"Daily Cash" is now Inactive.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+
+    expect(await screen.findByText('Summit Points')).toBeInTheDocument();
+    expect(screen.queryByText('Daily Cash')).not.toBeInTheDocument();
+    expect(screen.queryByText('"Daily Cash" is now Inactive.')).not.toBeInTheDocument();
+  });
+
+  it('renders /rules with source metadata, effective dates, null fields, unheld products, and 180/181 staleness', async () => {
+    mockT39Fetch();
+    render(<App initialEntries={['/rules']} rulesReferenceDate="2026-11-20" />);
+
+    // Product 1 rules (one 180-day Fresh, one 181-day Stale with null optional fields)
+    expect(await screen.findByText('nwcash.dining')).toBeInTheDocument();
+    expect(screen.getByText('nwcash.base')).toBeInTheDocument();
+
+    const ruleCards = screen.getAllByTestId('earning-rule-item');
+    // 180 days -> Fresh
+    expect(within(ruleCards[0]).getByText('Fresh')).toBeInTheDocument();
+    expect(within(ruleCards[0]).getByText('Reviewed 180 days ago')).toBeInTheDocument();
+    expect(within(ruleCards[0]).getByText('Northwind Sample Terms v1')).toBeInTheDocument();
+    expect(within(ruleCards[0]).getByText('2026-01-01 to 2026-12-31')).toBeInTheDocument();
+    expect(within(ruleCards[0]).getByText('$500.00 per quarterly (nwcash_dining_q)')).toBeInTheDocument();
+
+    // 181 days -> Stale, null effective_to and null url
+    expect(within(ruleCards[1]).getByText('Stale')).toBeInTheDocument();
+    expect(
+      within(ruleCards[1]).getByText('Stale source (181 days since review; threshold 180 days)'),
+    ).toBeInTheDocument();
+    expect(within(ruleCards[1]).getByText('2026-01-01 to No end date')).toBeInTheDocument();
+    expect(within(ruleCards[1]).queryByText(/Source URL:/)).not.toBeInTheDocument();
+
+    // Switch to unheld catalog product 3 (Horizon Summit Points, 179 days -> Fresh)
+    fireEvent.change(screen.getByLabelText('Inspect Rules for Card Product'), {
+      target: { value: '3' },
+    });
+    expect(await screen.findByText('horizon.travel')).toBeInTheDocument();
+    expect(screen.getByText('Reviewed 179 days ago')).toBeInTheDocument();
+  });
+
+  it('handles independent error/retry and empty states for catalog, held cards, and rules', async () => {
+    mockT39Fetch({ catalogOk: false, cardsOk: false });
+    const { unmount } = render(<App initialEntries={['/cards']} />);
+
+    expect(await screen.findByRole('button', { name: 'Retry Catalog' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retry Held Cards' })).toBeInTheDocument();
+    unmount();
+
+    mockT39Fetch({ rulesOk: false });
+    const { unmount: unmountRulesErr } = render(
+      <App initialEntries={['/rules']} rulesReferenceDate="2026-11-20" />,
+    );
+    expect(await screen.findByRole('button', { name: 'Retry Rules' })).toBeInTheDocument();
+    unmountRulesErr();
+
+    mockT39Fetch({ emptyRules: true });
+    render(<App initialEntries={['/rules']} rulesReferenceDate="2026-11-20" />);
+    expect(
+      await screen.findByText('No earning rules defined for this card product.'),
+    ).toBeInTheDocument();
+  });
+
+  it('handles missing/invalid dates, custom thresholds, leap-year, and year boundaries in getRuleStaleness', () => {
+    expect(getRuleStaleness('', '2026-11-20')).toEqual({
+      ageDays: null,
+      isStale: false,
+      thresholdDays: 180,
+    });
+    expect(getRuleStaleness('2026-02-30', '2026-11-20')).toEqual({
+      ageDays: null,
+      isStale: false,
+      thresholdDays: 180,
+    });
+    expect(getRuleStaleness('not-a-date', '2026-11-20')).toEqual({
+      ageDays: null,
+      isStale: false,
+      thresholdDays: 180,
+    });
+    expect(getRuleStaleness('2026-05-24', new Date('invalid'))).toEqual({
+      ageDays: null,
+      isStale: false,
+      thresholdDays: 180,
+    });
+
+    // Custom threshold
+    expect(getRuleStaleness('2026-10-21', '2026-11-20', 30)).toEqual({
+      ageDays: 30,
+      isStale: false,
+      thresholdDays: 30,
+    });
+    expect(getRuleStaleness('2026-10-20', '2026-11-20', 30)).toEqual({
+      ageDays: 31,
+      isStale: true,
+      thresholdDays: 30,
+    });
+
+    // Leap-year and month/year boundaries
+    expect(getRuleStaleness('2024-02-28', '2024-03-01')).toEqual({
+      ageDays: 2,
+      isStale: false,
+      thresholdDays: 180,
+    });
+    expect(getRuleStaleness('2025-02-28', '2025-03-01')).toEqual({
+      ageDays: 1,
+      isStale: false,
+      thresholdDays: 180,
+    });
+    expect(getRuleStaleness('2025-12-31', '2026-01-01')).toEqual({
+      ageDays: 1,
+      isStale: false,
+      thresholdDays: 180,
+    });
+  });
+
+  it('prevents in-flight add-card mutation from leaking feedback or clearing form after profile switch', async () => {
+    let resolveDeferredPost!: (res: Response) => void;
+    let rejectDeferredPost!: (reason?: unknown) => void;
+    let mayaCardsFetchCount = 0;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+
+      if (url.endsWith('/healthz')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ status: 'ok', version: '0.1.0' }),
+        } as Response);
+      }
+      if (url.endsWith('/profiles') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_PROFILES,
+        } as Response);
+      }
+      if (url.endsWith('/card-products') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_CATALOG_PRODUCTS,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/maya/cards') && method === 'GET') {
+        mayaCardsFetchCount += 1;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_CARDS.maya,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/dev/cards') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_CARDS.dev,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/maya/cards') && method === 'POST') {
+        return new Promise<Response>((resolve, reject) => {
+          resolveDeferredPost = resolve;
+          rejectDeferredPost = reject;
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+        json: async () => ({ title: 'Not Found' }),
+      } as Response);
+    });
+
+    // Success variant
+    const { unmount } = render(<App initialEntries={['/cards']} />);
+    await screen.findByText('Daily Cash');
+    const initialMayaFetches = mayaCardsFetchCount;
+
+    fireEvent.change(screen.getByLabelText('Card Nickname'), { target: { value: 'Maya New Card' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+
+    // Switch to Dev while Maya's POST is in flight
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    await screen.findByText('Summit Points');
+    fireEvent.change(screen.getByLabelText('Card Nickname'), { target: { value: 'Dev Draft' } });
+
+    resolveDeferredPost({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        id: 999,
+        profile_id: 1,
+        card_product_id: 1,
+        nickname: 'Maya New Card',
+        opened_on: null,
+        is_active: true,
+        card_product: MOCK_CATALOG_PRODUCTS[0],
+      }),
+    } as Response);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Card Nickname')).toHaveValue('Dev Draft');
+    });
+    expect(screen.queryByText(/Added "Maya New Card"/)).not.toBeInTheDocument();
+
+    // Switching back to Maya triggers a refetch because ['profile', 'maya'] was invalidated
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'maya' } });
+    await waitFor(() => {
+      expect(mayaCardsFetchCount).toBeGreaterThan(initialMayaFetches);
+    });
+    unmount();
+
+    // Failure variant
+    render(<App initialEntries={['/cards']} />);
+    await screen.findByText('Daily Cash');
+    fireEvent.change(screen.getByLabelText('Card Nickname'), { target: { value: 'Maya Fail Card' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    await screen.findByText('Summit Points');
+
+    rejectDeferredPost(new Error('Network timeout for Maya'));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Card Nickname')).toHaveValue('Maya Fail Card');
+  });
+
+  it('hardens source URLs in /rules: renders https link safely and blocks unsafe schemes', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ status: 'ok', version: '0.1.0' }),
+        } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/card-products')) {
+        return { ok: true, status: 200, json: async () => MOCK_CATALOG_PRODUCTS } as Response;
+      }
+      if (url.endsWith('/card-products/1/rules')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            MOCK_PRODUCT_RULES[1][0],
+            {
+              ...(MOCK_PRODUCT_RULES[1][1] as Record<string, unknown>),
+              source: {
+                id: 99,
+                title: 'Unsafe Source Test',
+                kind: 'fictional_sample',
+                url: 'javascript:alert(1)',
+                notes: 'Should not render as anchor',
+                last_reviewed_on: '2026-10-01',
+              },
+            },
+          ],
+        } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/rules']} rulesReferenceDate="2026-11-20" />);
+
+    const safeLink = await screen.findByRole('link', {
+      name: 'https://example.invalid/northwind-terms',
+    });
+    expect(safeLink).toHaveAttribute('href', 'https://example.invalid/northwind-terms');
+    expect(safeLink).toHaveAttribute('target', '_blank');
+    expect(safeLink).toHaveAttribute('rel', 'noopener noreferrer');
+
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'javascript:alert(1)' })).not.toBeInTheDocument();
+  });
+
+  it('preserves card and displays error alert when PATCH update fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles') && method === 'GET') {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/card-products') && method === 'GET') {
+        return { ok: true, status: 200, json: async () => MOCK_CATALOG_PRODUCTS } as Response;
+      }
+      if (url.endsWith('/profiles/maya/cards') && method === 'GET') {
+        return { ok: true, status: 200, json: async () => MOCK_CARDS.maya } as Response;
+      }
+      if (url.includes('/profiles/maya/cards/') && method === 'PATCH') {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({
+            title: 'Internal Server Error',
+            status: 500,
+            detail: 'Update failed on server.',
+          }),
+        } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/cards']} />);
+    await screen.findByText('Daily Cash');
+
+    const firstCard = screen.getAllByTestId('held-card-item')[0];
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Deactivate' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Update failed on server.');
+    expect(within(firstCard).getByText('Status: Active')).toBeInTheDocument();
+  });
+
+  it('does not issue profile-specific card queries when no profile is selected on /cards', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => [] } as Response;
+      }
+      if (url.endsWith('/card-products')) {
+        return { ok: true, status: 200, json: async () => MOCK_CATALOG_PRODUCTS } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/cards']} />);
+
+    expect(
+      await screen.findByText('Select a demo profile to view and manage held cards.'),
+    ).toBeInTheDocument();
+    expect(await screen.findByLabelText('Catalog Card Product')).toBeDisabled();
+    expect(
+      fetchSpy.mock.calls.some(([input]) => String(input).includes('/profiles/') && String(input).includes('/cards')),
+    ).toBe(false);
+  });
+
+  it('recovers when clicking Retry Catalog, Retry Held Cards, and Retry Rules', async () => {
+    let catalogFails = true;
+    let cardsFails = true;
+    let rulesFails = true;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/card-products')) {
+        if (catalogFails) {
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ title: 'Unavailable', detail: 'Catalog error' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => MOCK_CATALOG_PRODUCTS } as Response;
+      }
+      if (url.endsWith('/profiles/maya/cards')) {
+        if (cardsFails) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Error', detail: 'Held cards error' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => MOCK_CARDS.maya } as Response;
+      }
+      if (url.endsWith('/card-products/1/rules')) {
+        if (rulesFails) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Error', detail: 'Rules error' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => MOCK_PRODUCT_RULES[1] } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    const { unmount } = render(<App initialEntries={['/cards']} />);
+    const retryCatalog = await screen.findByRole('button', { name: 'Retry Catalog' });
+    const retryCards = await screen.findByRole('button', { name: 'Retry Held Cards' });
+
+    catalogFails = false;
+    cardsFails = false;
+    fireEvent.click(retryCatalog);
+    fireEvent.click(retryCards);
+
+    expect(await screen.findByLabelText('Catalog Card Product')).toBeInTheDocument();
+    expect(await screen.findByText('Daily Cash')).toBeInTheDocument();
+    unmount();
+
+    render(<App initialEntries={['/rules']} rulesReferenceDate="2026-11-20" />);
+    const retryRules = await screen.findByRole('button', { name: 'Retry Rules' });
+    rulesFails = false;
+    fireEvent.click(retryRules);
+
+    expect(await screen.findByText('nwcash.dining')).toBeInTheDocument();
   });
 });
