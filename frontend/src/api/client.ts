@@ -18,6 +18,16 @@ export type CardRecommendationItem = components['schemas']['CardRecommendationIt
 export type AppliedPortionSchema = components['schemas']['AppliedPortionSchema'];
 export type BenefitStatusItem = components['schemas']['BenefitStatusItem'];
 export type RewardsSummaryResponse = components['schemas']['RewardsSummaryResponse'];
+export type TransactionCreate = components['schemas']['TransactionCreate'];
+export type TransactionSummary = components['schemas']['TransactionSummary'];
+export type TransactionRewardCalcSummary = components['schemas']['TransactionRewardCalcSummary'];
+
+export interface TransactionFilters {
+  profile_card_id?: number;
+  category_code?: string;
+  date_from?: string;
+  date_to?: string;
+}
 
 export interface ValidationErrorDetail {
   loc: string[];
@@ -291,6 +301,56 @@ export async function upsertProfileValuation(
       method: 'PUT',
       body: JSON.stringify({ cents_per_unit: String(payload.cents_per_unit) }),
     },
+    baseUrl,
+  );
+}
+
+export async function fetchProfileTransactions(
+  profileKey: string,
+  filters?: TransactionFilters,
+  baseUrl?: string,
+): Promise<TransactionSummary[]> {
+  const params = new URLSearchParams();
+  if (filters?.profile_card_id !== undefined) {
+    params.set('profile_card_id', String(filters.profile_card_id));
+  }
+  if (filters?.category_code) {
+    params.set('category_code', filters.category_code);
+  }
+  if (filters?.date_from) {
+    params.set('date_from', filters.date_from);
+  }
+  if (filters?.date_to) {
+    params.set('date_to', filters.date_to);
+  }
+  const qs = params.toString();
+  const path = `/profiles/${encodeURIComponent(profileKey)}/transactions${qs ? `?${qs}` : ''}`;
+  return apiRequest<TransactionSummary[]>(path, { method: 'GET' }, baseUrl);
+}
+
+export async function createProfileTransaction(
+  profileKey: string,
+  payload: TransactionCreate,
+  baseUrl?: string,
+): Promise<TransactionSummary> {
+  return apiRequest<TransactionSummary>(
+    `/profiles/${encodeURIComponent(profileKey)}/transactions`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    baseUrl,
+  );
+}
+
+export async function deleteProfileTransaction(
+  profileKey: string,
+  transactionId: number,
+  baseUrl?: string,
+): Promise<void> {
+  return apiRequest<void>(
+    `/profiles/${encodeURIComponent(profileKey)}/transactions/${encodeURIComponent(String(transactionId))}`,
+    { method: 'DELETE' },
     baseUrl,
   );
 }

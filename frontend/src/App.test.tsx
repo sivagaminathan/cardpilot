@@ -2449,3 +2449,525 @@ describe('T41 Settings / Valuations view', () => {
     expect(await screen.findByTestId('valuation-row-NW_CASH')).toBeInTheDocument();
   });
 });
+
+const MOCK_TRANSACTIONS_MAYA = [
+  {
+    id: 501,
+    profile_id: 1,
+    profile_card_id: 101,
+    card_name: 'Daily Cash',
+    amount_cents: 5000,
+    category_code: 'dining',
+    category_name: 'Dining',
+    merchant_id: 10,
+    merchant_name: 'Harbor Bistro',
+    merchant_text: null,
+    occurred_on: '2026-11-15',
+    note: 'Dinner with team',
+    created_at: '2026-11-15T12:00:00Z',
+    reward_calc: {
+      id: 901,
+      engine_version: '1.0.0',
+      reward_currency: 'NW_CASH',
+      reward_units: '1.5000',
+      valuation_cents_per_unit_used: '1.0000',
+      estimated_value_cents: 150,
+      applied_rule_ids: [11],
+      trace: {
+        status: 'ranked',
+        applied_portions: [
+          {
+            portion_cents: 5000,
+            rule_id: 11,
+            rule_key: 'nwcash.dining',
+            rule_version: 1,
+            multiplier: '3.0',
+            reward_units: '1.5000',
+          },
+        ],
+        explanation: ['Matched dining 3x rule.'],
+        warnings: ['Cap 50% used.'],
+      },
+      created_at: '2026-11-15T12:00:00Z',
+    },
+  },
+];
+
+const MOCK_TRANSACTIONS_DEV = [
+  {
+    id: 601,
+    profile_id: 2,
+    profile_card_id: 201,
+    card_name: 'Summit Points',
+    amount_cents: 12000,
+    category_code: 'travel',
+    category_name: 'Travel',
+    merchant_id: null,
+    merchant_name: null,
+    merchant_text: 'Rail Express',
+    occurred_on: '2026-11-18',
+    note: '',
+    created_at: '2026-11-18T12:00:00Z',
+    reward_calc: {
+      id: 902,
+      engine_version: '1.0.0',
+      reward_currency: 'HORIZON_PTS',
+      reward_units: '480.0000',
+      valuation_cents_per_unit_used: null,
+      estimated_value_cents: null,
+      applied_rule_ids: [31],
+      trace: {
+        status: 'unranked',
+        applied_portions: [],
+        explanation: ['Earned 480.0000 HORIZON_PTS under travel 4x rule.'],
+        warnings: [],
+      },
+      created_at: '2026-11-18T12:00:00Z',
+    },
+  },
+];
+
+function mockT42Fetch(options?: {
+  profiles?: typeof MOCK_PROFILES;
+  txOk?: boolean;
+  deleteOk?: boolean;
+  createStatus?: number;
+}) {
+  const profiles = options?.profiles ?? MOCK_PROFILES;
+  const txOk = options?.txOk ?? true;
+  const deleteOk = options?.deleteOk ?? true;
+  const createStatus = options?.createStatus ?? 201;
+
+  const txByProfile: Record<string, Array<Record<string, unknown>>> = {
+    maya: JSON.parse(JSON.stringify(MOCK_TRANSACTIONS_MAYA)),
+    dev: JSON.parse(JSON.stringify(MOCK_TRANSACTIONS_DEV)),
+  };
+  let nextTxId = 700;
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? 'GET';
+
+    if (url.endsWith('/healthz')) {
+      return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+    }
+    if (url.endsWith('/profiles') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => profiles } as Response;
+    }
+    if (url.endsWith('/categories') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => MOCK_CATEGORIES } as Response;
+    }
+    if (url.endsWith('/merchants') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => MOCK_MERCHANTS } as Response;
+    }
+    if (url.endsWith('/profiles/maya/cards') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => MOCK_CARDS.maya } as Response;
+    }
+    if (url.endsWith('/profiles/dev/cards') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => MOCK_CARDS.dev } as Response;
+    }
+
+    const txCollectionMatch = url.match(/\/profiles\/([^/]+)\/transactions(?:\?(.*))?$/);
+    if (txCollectionMatch) {
+      const slug = decodeURIComponent(txCollectionMatch[1]);
+      if (method === 'GET') {
+        if (!txOk) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Error', detail: 'Transactions failed' }),
+          } as Response;
+        }
+        const query = new URLSearchParams(txCollectionMatch[2] ?? '');
+        let list = txByProfile[slug] ?? [];
+        const cardFilter = query.get('profile_card_id');
+        if (cardFilter) {
+          list = list.filter((t) => String(t.profile_card_id) === cardFilter);
+        }
+        const catFilter = query.get('category_code');
+        if (catFilter) {
+          list = list.filter((t) => t.category_code === catFilter);
+        }
+        const df = query.get('date_from');
+        if (df) {
+          list = list.filter((t) => String(t.occurred_on) >= df);
+        }
+        const dt = query.get('date_to');
+        if (dt) {
+          list = list.filter((t) => String(t.occurred_on) <= dt);
+        }
+        return { ok: true, status: 200, json: async () => list } as Response;
+      }
+
+      if (method === 'POST') {
+        if (createStatus !== 201) {
+          return {
+            ok: false,
+            status: createStatus,
+            json: async () => ({
+              title: 'Unprocessable Entity',
+              status: createStatus,
+              detail: 'Validation failed.',
+              errors: [
+                {
+                  loc: ['body', 'note'],
+                  msg: 'Value must not contain 13-19 digit card numbers.',
+                  type: 'value_error',
+                },
+              ],
+            }),
+          } as Response;
+        }
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          profile_card_id: number;
+          amount_cents: number;
+          category_code: string;
+          merchant_id?: number | null;
+          merchant_text?: string | null;
+          occurred_on: string;
+          note?: string;
+        };
+        const created = {
+          id: nextTxId++,
+          profile_id: slug === 'maya' ? 1 : 2,
+          profile_card_id: body.profile_card_id,
+          card_name: slug === 'maya' ? 'Daily Cash' : 'Summit Points',
+          amount_cents: body.amount_cents,
+          category_code: body.category_code,
+          category_name:
+            MOCK_CATEGORIES.find((c) => c.code === body.category_code)?.name ?? body.category_code,
+          merchant_id: body.merchant_id ?? null,
+          merchant_name:
+            body.merchant_id != null
+              ? (MOCK_MERCHANTS.find((m) => m.id === body.merchant_id)?.name ?? null)
+              : null,
+          merchant_text: body.merchant_text ?? null,
+          occurred_on: body.occurred_on,
+          note: body.note ?? '',
+          created_at: '2026-11-22T18:00:00Z',
+          reward_calc: {
+            id: nextTxId + 1000,
+            engine_version: '1.0.0',
+            reward_currency: 'NW_CASH',
+            reward_units: '2.0000',
+            valuation_cents_per_unit_used: '1.0000',
+            estimated_value_cents: 200,
+            applied_rule_ids: [11],
+            trace: {
+              status: 'ranked',
+              applied_portions: [],
+              explanation: ['Calculated 2.0000 NW_CASH snapshot.'],
+              warnings: [],
+            },
+            created_at: '2026-11-22T18:00:00Z',
+          },
+        };
+        txByProfile[slug] = [created, ...(txByProfile[slug] ?? [])];
+        return { ok: true, status: 201, json: async () => created } as Response;
+      }
+    }
+
+    const txDeleteMatch = url.match(/\/profiles\/([^/]+)\/transactions\/(\d+)$/);
+    if (txDeleteMatch && method === 'DELETE') {
+      const slug = decodeURIComponent(txDeleteMatch[1]);
+      const txId = Number(txDeleteMatch[2]);
+      if (!deleteOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Error', detail: 'Delete failed on server.' }),
+        } as Response;
+      }
+      txByProfile[slug] = (txByProfile[slug] ?? []).filter((t) => t.id !== txId);
+      return { ok: true, status: 204 } as Response;
+    }
+
+    return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+  });
+}
+
+describe('T42 Transactions view', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('creates transactions with seeded or custom merchant (mutually exclusive), validates USD, and shows snapshot', async () => {
+    const fetchSpy = mockT42Fetch();
+    render(<App initialEntries={['/transactions']} />);
+
+    await screen.findByLabelText('Active Card');
+    expect(screen.getByText('1 inactive card is excluded.')).toBeInTheDocument();
+
+    // Note safety hint
+    const noteInput = screen.getByLabelText('Note (optional)');
+    expect(noteInput).toHaveAttribute('aria-describedby', 'tx-note-safety-hint');
+    expect(
+      screen.getByText('Do not enter real card numbers or sensitive data.'),
+    ).toBeInTheDocument();
+
+    // Invalid USD amount -> no POST
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record Transaction' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Enter a positive USD amount with up to two decimal places',
+    );
+    expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+
+    // Seeded merchant creation
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '25.00' } });
+    fireEvent.change(screen.getByLabelText('Seeded Merchant (optional)'), {
+      target: { value: '10' },
+    });
+    fireEvent.change(noteInput, { target: { value: 'Coffee' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record Transaction' }));
+
+    const snapshotBanner = await screen.findByTestId('tx-created-snapshot');
+    expect(snapshotBanner).toHaveTextContent(/Earned 2\.0000 NW_CASH/);
+    expect(within(snapshotBanner).getByText(/Calculated 2\.0000 NW_CASH snapshot/)).toBeInTheDocument();
+
+    const firstPost = fetchSpy.mock.calls.find(
+      ([u, init]) => String(u).includes('/transactions') && init?.method === 'POST',
+    );
+    const firstPayload = JSON.parse(String(firstPost?.[1]?.body)) as Record<string, unknown>;
+    expect(firstPayload.merchant_id).toBe(10);
+    expect('merchant_text' in firstPayload).toBe(false);
+
+    // Custom merchant mode creation
+    fireEvent.change(screen.getByLabelText('Merchant Input Type'), { target: { value: 'custom' } });
+    const customInput = screen.getByLabelText('Custom Merchant (optional)');
+    expect(customInput).toHaveAttribute('aria-describedby', 'tx-merchant-safety-hint');
+    fireEvent.change(customInput, { target: { value: 'Corner Bakery' } });
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '15.00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record Transaction' }));
+
+    await waitFor(() => {
+      const posts = fetchSpy.mock.calls.filter(
+        ([u, init]) => String(u).includes('/transactions') && init?.method === 'POST',
+      );
+      expect(posts).toHaveLength(2);
+      const secondPayload = JSON.parse(String(posts[1]?.[1]?.body)) as Record<string, unknown>;
+      expect(secondPayload.merchant_text).toBe('Corner Bakery');
+      expect('merchant_id' in secondPayload).toBe(false);
+    });
+  });
+
+  it('surfaces 422 sensitive-data error without storing transaction', async () => {
+    mockT42Fetch({ createStatus: 422 });
+    render(<App initialEntries={['/transactions']} />);
+
+    await screen.findByLabelText('Active Card');
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '30.00' } });
+    fireEvent.change(screen.getByLabelText('Note (optional)'), {
+      target: { value: '4111111111111111' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Record Transaction' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Value must not contain 13-19 digit card numbers.',
+    );
+    expect(screen.queryByTestId('tx-created-snapshot')).not.toBeInTheDocument();
+  });
+
+  it('filters transactions, blocks invalid date ranges, clears filters, and toggles trace details', async () => {
+    const fetchSpy = mockT42Fetch();
+    render(<App initialEntries={['/transactions']} />);
+
+    expect(await screen.findByText('$50.00 at Harbor Bistro')).toBeInTheDocument();
+
+    // Trace expand/collapse
+    const txItem = screen.getByTestId('tx-list-item');
+    const traceBtn = within(txItem).getByRole('button', { name: 'Show trace' });
+    expect(traceBtn).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(traceBtn);
+    expect(traceBtn).toHaveAttribute('aria-expanded', 'true');
+    expect(within(txItem).getByText('Matched dining 3x rule.')).toBeInTheDocument();
+    expect(within(txItem).getByText(/Cap 50% used/)).toBeInTheDocument();
+
+    // Filter by category with no matching result
+    fireEvent.change(screen.getByLabelText('Filter by Category'), { target: { value: 'travel' } });
+    expect(
+      await screen.findByText('No transactions recorded for the selected filters.'),
+    ).toBeInTheDocument();
+
+    // Invalid date range blocks API request
+    fireEvent.change(screen.getByLabelText('Date From'), { target: { value: '2026-11-20' } });
+    const callsBeforeInvalidRange = fetchSpy.mock.calls.length;
+    fireEvent.change(screen.getByLabelText('Date To'), { target: { value: '2026-11-10' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Date From must not be after Date To.',
+    );
+    expect(fetchSpy.mock.calls.length).toBe(callsBeforeInvalidRange);
+
+    // Clear Filters restores full list
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+    expect(await screen.findByText('$50.00 at Harbor Bistro')).toBeInTheDocument();
+  });
+
+  it('handles delete cancellation, success, and failure', async () => {
+    mockT42Fetch({ deleteOk: true });
+    const { unmount } = render(<App initialEntries={['/transactions']} />);
+
+    await screen.findByText('$50.00 at Harbor Bistro');
+    const txItem = screen.getByTestId('tx-list-item');
+
+    // Cancel confirmation
+    fireEvent.click(within(txItem).getByRole('button', { name: 'Remove' }));
+    expect(
+      within(txItem).getByRole('group', { name: /Confirm removal of transaction 501/i }),
+    ).toBeInTheDocument();
+    fireEvent.click(within(txItem).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByText('$50.00 at Harbor Bistro')).toBeInTheDocument();
+
+    // Confirm delete
+    fireEvent.click(within(txItem).getByRole('button', { name: 'Remove' }));
+    fireEvent.click(within(txItem).getByRole('button', { name: 'Confirm Remove' }));
+    await waitFor(() => {
+      expect(screen.queryByText('$50.00 at Harbor Bistro')).not.toBeInTheDocument();
+    });
+    unmount();
+
+    // Delete failure preserves transaction
+    mockT42Fetch({ deleteOk: false });
+    render(<App initialEntries={['/transactions']} />);
+    await screen.findByText('$50.00 at Harbor Bistro');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Remove' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed on server.');
+    expect(screen.getByText('$50.00 at Harbor Bistro')).toBeInTheDocument();
+  });
+
+  it('isolates profile switch during deferred POST, handles empty profiles, and recovers on retry', async () => {
+    let resolveDeferredPost!: (res: Response) => void;
+    let mayaTxFetches = 0;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/healthz')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response);
+      }
+      if (url.endsWith('/profiles')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_PROFILES } as Response);
+      }
+      if (url.endsWith('/categories')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_CATEGORIES } as Response);
+      }
+      if (url.endsWith('/merchants')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_MERCHANTS } as Response);
+      }
+      if (url.endsWith('/profiles/maya/cards')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_CARDS.maya } as Response);
+      }
+      if (url.endsWith('/profiles/dev/cards')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_CARDS.dev } as Response);
+      }
+      if (url.includes('/profiles/maya/transactions') && method === 'GET') {
+        mayaTxFetches += 1;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_TRANSACTIONS_MAYA,
+        } as Response);
+      }
+      if (url.includes('/profiles/dev/transactions') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_TRANSACTIONS_DEV,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/maya/transactions') && method === 'POST') {
+        return new Promise<Response>((resolve) => {
+          resolveDeferredPost = resolve;
+        });
+      }
+      return Promise.resolve({ ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response);
+    });
+
+    const { unmount } = render(<App initialEntries={['/transactions']} />);
+    await screen.findByText('$50.00 at Harbor Bistro');
+    const initialMayaFetches = mayaTxFetches;
+
+    fireEvent.change(screen.getByLabelText('Amount (USD)'), { target: { value: '20.00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record Transaction' }));
+
+    // Switch to Dev before Maya POST resolves
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    expect(await screen.findByText('$120.00 at Rail Express')).toBeInTheDocument();
+
+    resolveDeferredPost({
+      ok: true,
+      status: 201,
+      json: async () => MOCK_TRANSACTIONS_MAYA[0],
+    } as Response);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('tx-created-snapshot')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Recorded \$50\.00/)).not.toBeInTheDocument();
+
+    // Switching back to Maya refetches due to ['profile', 'maya'] invalidation
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'maya' } });
+    await waitFor(() => {
+      expect(mayaTxFetches).toBeGreaterThan(initialMayaFetches);
+    });
+    unmount();
+
+    // Empty profiles -> no profile requests
+    const emptyFetchSpy = mockT42Fetch({ profiles: [] });
+    const { unmount: unmountEmpty } = render(<App initialEntries={['/transactions']} />);
+    expect(
+      await screen.findByText('Select a demo profile to record and view transactions.'),
+    ).toBeInTheDocument();
+    expect(
+      emptyFetchSpy.mock.calls.some(([u]) => String(u).includes('/profiles/')),
+    ).toBe(false);
+    unmountEmpty();
+
+    // Retry recovery on transactions error
+    let failTx = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/categories')) {
+        return { ok: true, status: 200, json: async () => MOCK_CATEGORIES } as Response;
+      }
+      if (url.endsWith('/merchants')) {
+        return { ok: true, status: 200, json: async () => MOCK_MERCHANTS } as Response;
+      }
+      if (url.endsWith('/profiles/maya/cards')) {
+        return { ok: true, status: 200, json: async () => MOCK_CARDS.maya } as Response;
+      }
+      if (url.includes('/profiles/maya/transactions')) {
+        if (failTx) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Error', detail: 'Tx fetch failed' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => MOCK_TRANSACTIONS_MAYA } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/transactions']} />);
+    const retryTxBtn = await screen.findByRole('button', { name: 'Retry Transactions' });
+    failTx = false;
+    fireEvent.click(retryTxBtn);
+    expect(await screen.findByText('$50.00 at Harbor Bistro')).toBeInTheDocument();
+  });
+});

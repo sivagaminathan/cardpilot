@@ -2,13 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   addProfileCard,
+  createProfileTransaction,
   deleteProfileCard,
+  deleteProfileTransaction,
   fetchCardProductRules,
   fetchCardProducts,
   fetchCategories,
   fetchMerchants,
   fetchProfileBenefits,
   fetchProfileCards,
+  fetchProfileTransactions,
   fetchProfileValuations,
   fetchProfiles,
   fetchRewardCurrencies,
@@ -506,6 +509,123 @@ describe('API client', () => {
           loc: ['body', 'cents_per_unit'],
           msg: 'Input should be less than or equal to 10',
           type: 'less_than_equal',
+        },
+      ],
+    });
+  });
+
+  it('fetches, creates, and deletes profile transactions with filters, 204, and 422 errors', async () => {
+    const deleteJsonSpy = vi.fn(async () => {
+      throw new Error('should not parse 204 body');
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 501,
+          amount_cents: 4250,
+          card_name: 'Daily Cash',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: deleteJsonSpy,
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          title: 'Unprocessable Entity',
+          status: 422,
+          detail: 'Validation failed.',
+          errors: [
+            {
+              loc: ['body', 'note'],
+              msg: 'Value must not contain 13-19 digit card numbers.',
+              type: 'value_error',
+            },
+          ],
+        }),
+      } as Response);
+
+    await fetchProfileTransactions(
+      'maya/1',
+      {
+        profile_card_id: 101,
+        category_code: 'dining',
+        date_from: '2026-11-01',
+        date_to: '2026-11-22',
+      },
+      'https://api.cardpilot.demo',
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/transactions?profile_card_id=101&category_code=dining&date_from=2026-11-01&date_to=2026-11-22',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const created = await createProfileTransaction(
+      'maya/1',
+      {
+        profile_card_id: 101,
+        amount_cents: 4250,
+        category_code: 'dining',
+        merchant_id: 10,
+        occurred_on: '2026-11-22',
+        note: 'Lunch',
+      },
+      'https://api.cardpilot.demo',
+    );
+    expect(created.id).toBe(501);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/transactions',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          profile_card_id: 101,
+          amount_cents: 4250,
+          category_code: 'dining',
+          merchant_id: 10,
+          occurred_on: '2026-11-22',
+          note: 'Lunch',
+        }),
+      }),
+    );
+
+    await expect(deleteProfileTransaction('maya/1', 501)).resolves.toBeUndefined();
+    expect(deleteJsonSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/profiles/maya%2F1/transactions/501',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+
+    await expect(
+      createProfileTransaction('maya', {
+        profile_card_id: 101,
+        amount_cents: 4250,
+        category_code: 'dining',
+        occurred_on: '2026-11-22',
+        note: '4111111111111111',
+      }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      errors: [
+        {
+          loc: ['body', 'note'],
+          msg: 'Value must not contain 13-19 digit card numbers.',
+          type: 'value_error',
         },
       ],
     });

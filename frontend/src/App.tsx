@@ -15,6 +15,7 @@ import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { Header, type ResetFeedback } from './components/Header';
 import { RulesView } from './components/RulesView';
 import { SettingsView } from './components/SettingsView';
+import { TransactionsView } from './components/TransactionsView';
 
 interface PlaceholderPageProps {
   title: string;
@@ -119,15 +120,7 @@ export const AppShell: React.FC<AppShellProps> = ({ rulesReferenceDate }) => {
           />
           <Route path="/cards" element={<CardsView profileId={activeProfileKey} />} />
           <Route path="/compare" element={<CompareView profileId={activeProfileKey} />} />
-          <Route
-            path="/transactions"
-            element={
-              <PlaceholderPage
-                title="Transactions View"
-                description="Transaction recording and snapshot history are scheduled for T42."
-              />
-            }
-          />
+          <Route path="/transactions" element={<TransactionsView profileId={activeProfileKey} />} />
           <Route
             path="/benefits"
             element={
