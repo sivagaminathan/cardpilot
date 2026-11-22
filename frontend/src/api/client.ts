@@ -4,6 +4,9 @@ export type ProfileSummary = components['schemas']['ProfileSummary'];
 export type ProfileResetResponse = components['schemas']['ProfileResetResponse'];
 export type CategorySummary = components['schemas']['CategorySummary'];
 export type MerchantSummary = components['schemas']['MerchantSummary'];
+export type RewardCurrencySummary = components['schemas']['RewardCurrencySummary'];
+export type CurrencyValuationSummary = components['schemas']['CurrencyValuationSummary'];
+export type CurrencyValuationUpdate = components['schemas']['CurrencyValuationUpdate'];
 export type CardProductSummary = components['schemas']['CardProductSummary'];
 export type EarningRuleSummary = components['schemas']['EarningRuleSummary'];
 export type ProfileCardCreate = components['schemas']['ProfileCardCreate'];
@@ -256,6 +259,37 @@ export async function recommendCards(
     {
       method: 'POST',
       body: JSON.stringify(payload),
+    },
+    baseUrl,
+  );
+}
+
+export async function fetchRewardCurrencies(baseUrl?: string): Promise<RewardCurrencySummary[]> {
+  return apiRequest<RewardCurrencySummary[]>('/reward-currencies', { method: 'GET' }, baseUrl);
+}
+
+export async function fetchProfileValuations(
+  profileKey: string,
+  baseUrl?: string,
+): Promise<CurrencyValuationSummary[]> {
+  return apiRequest<CurrencyValuationSummary[]>(
+    `/profiles/${encodeURIComponent(profileKey)}/valuations`,
+    { method: 'GET' },
+    baseUrl,
+  );
+}
+
+export async function upsertProfileValuation(
+  profileKey: string,
+  currencyKey: string,
+  payload: CurrencyValuationUpdate,
+  baseUrl?: string,
+): Promise<CurrencyValuationSummary> {
+  return apiRequest<CurrencyValuationSummary>(
+    `/profiles/${encodeURIComponent(profileKey)}/valuations/${encodeURIComponent(currencyKey)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ cents_per_unit: String(payload.cents_per_unit) }),
     },
     baseUrl,
   );

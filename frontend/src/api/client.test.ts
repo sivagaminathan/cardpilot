@@ -9,12 +9,15 @@ import {
   fetchMerchants,
   fetchProfileBenefits,
   fetchProfileCards,
+  fetchProfileValuations,
   fetchProfiles,
+  fetchRewardCurrencies,
   fetchRewardsSummary,
   getApiBaseUrl,
   recommendCards,
   resetProfile,
   updateProfileCard,
+  upsertProfileValuation,
 } from './client';
 
 describe('API client', () => {
@@ -409,6 +412,100 @@ describe('API client', () => {
           loc: ['body', 'amount_cents'],
           msg: 'Input should be greater than 0',
           type: 'greater_than',
+        },
+      ],
+    });
+  });
+
+  it('fetches reward currencies and profile valuations, upserts valuation via PUT, and handles 422 errors', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 1, code: 'NW_CASH', name: 'Northwind Cash' }],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [
+          {
+            profile_id: 1,
+            reward_currency_id: 1,
+            cents_per_unit: '1.0000',
+            is_user_set: false,
+          },
+        ],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          profile_id: 1,
+          reward_currency_id: 3,
+          cents_per_unit: '1.7500',
+          is_user_set: true,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          title: 'Unprocessable Entity',
+          status: 422,
+          detail: 'Validation failed.',
+          errors: [
+            {
+              loc: ['body', 'cents_per_unit'],
+              msg: 'Input should be less than or equal to 10',
+              type: 'less_than_equal',
+            },
+          ],
+        }),
+      } as Response);
+
+    const currencies = await fetchRewardCurrencies('https://api.cardpilot.demo');
+    expect(currencies).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://api.cardpilot.demo/api/v1/reward-currencies',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const valuations = await fetchProfileValuations('maya/1', 'https://api.cardpilot.demo');
+    expect(valuations).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/valuations',
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    const updated = await upsertProfileValuation(
+      'maya/1',
+      'SKY/MILES',
+      { cents_per_unit: '1.7500' },
+      'https://api.cardpilot.demo',
+    );
+    expect(updated.is_user_set).toBe(true);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/valuations/SKY%2FMILES',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ cents_per_unit: '1.7500' }),
+      }),
+    );
+
+    await expect(
+      upsertProfileValuation('maya', 'NW_CASH', { cents_per_unit: '12.0000' }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      errors: [
+        {
+          loc: ['body', 'cents_per_unit'],
+          msg: 'Input should be less than or equal to 10',
+          type: 'less_than_equal',
         },
       ],
     });

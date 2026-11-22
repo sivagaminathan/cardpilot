@@ -14,6 +14,7 @@ import { Dashboard } from './components/Dashboard';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { Header, type ResetFeedback } from './components/Header';
 import { RulesView } from './components/RulesView';
+import { SettingsView } from './components/SettingsView';
 
 interface PlaceholderPageProps {
   title: string;
@@ -145,15 +146,7 @@ export const AppShell: React.FC<AppShellProps> = ({ rulesReferenceDate }) => {
               />
             }
           />
-          <Route
-            path="/settings"
-            element={
-              <PlaceholderPage
-                title="Settings View"
-                description="Currency valuations editor is scheduled for T41."
-              />
-            }
-          />
+          <Route path="/settings" element={<SettingsView profileId={activeProfileKey} />} />
           <Route path="/rules" element={<RulesView referenceDate={rulesReferenceDate} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

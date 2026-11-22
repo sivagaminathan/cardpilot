@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { App } from './App';
 import { BackendStatus, getHealthUrl } from './components/BackendStatus';
-import { formatCentsToUsd, getTodayLocalIsoDate, parseUsdToCents } from './lib/formatters';
+import {
+  formatCentsToUsd,
+  getTodayLocalIsoDate,
+  parseUsdToCents,
+  parseValuationInput,
+} from './lib/formatters';
 import { getRuleStaleness } from './lib/rules';
 
 const MOCK_PROFILES = [
@@ -2004,5 +2009,443 @@ describe('T40 Compare view', () => {
     expect(
       fetchSpy.mock.calls.some(([u]) => String(u).includes('/profiles/')),
     ).toBe(false);
+  });
+});
+
+const MOCK_REWARD_CURRENCIES = [
+  {
+    id: 1,
+    code: 'NW_CASH',
+    name: 'Northwind Cash',
+    kind: 'cash_back',
+    is_cash_equivalent: true,
+    default_cents_per_unit: '1.0000',
+  },
+  {
+    id: 2,
+    code: 'HORIZON_PTS',
+    name: 'Horizon Points',
+    kind: 'points',
+    is_cash_equivalent: false,
+    default_cents_per_unit: '1.5000',
+  },
+  {
+    id: 3,
+    code: 'SKY_MILES',
+    name: 'Skyward Miles',
+    kind: 'miles',
+    is_cash_equivalent: false,
+    default_cents_per_unit: '1.2000',
+  },
+];
+
+function mockT41Fetch(options?: {
+  profiles?: typeof MOCK_PROFILES;
+  currenciesOk?: boolean;
+  valuationsOk?: boolean;
+  putStatus?: number;
+}) {
+  const profiles = options?.profiles ?? MOCK_PROFILES;
+  const currenciesOk = options?.currenciesOk ?? true;
+  const valuationsOk = options?.valuationsOk ?? true;
+  const putStatus = options?.putStatus ?? 200;
+
+  const valuationsByProfile: Record<string, Array<Record<string, unknown>>> = {
+    maya: [
+      {
+        profile_id: 1,
+        reward_currency_id: 1,
+        reward_currency: MOCK_REWARD_CURRENCIES[0],
+        cents_per_unit: '1.0000',
+        is_user_set: false,
+        updated_at: '2026-11-20T00:00:00Z',
+      },
+      {
+        profile_id: 1,
+        reward_currency_id: 2,
+        reward_currency: MOCK_REWARD_CURRENCIES[1],
+        cents_per_unit: '1.8000',
+        is_user_set: true,
+        updated_at: '2026-11-20T00:00:00Z',
+      },
+    ],
+    dev: [
+      {
+        profile_id: 2,
+        reward_currency_id: 2,
+        reward_currency: MOCK_REWARD_CURRENCIES[1],
+        cents_per_unit: '1.5000',
+        is_user_set: false,
+        updated_at: '2026-11-20T00:00:00Z',
+      },
+    ],
+  };
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? 'GET';
+
+    if (url.endsWith('/healthz')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', version: '0.1.0' }),
+      } as Response;
+    }
+    if (url.endsWith('/profiles') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => profiles } as Response;
+    }
+    if (url.endsWith('/reward-currencies') && method === 'GET') {
+      if (!currenciesOk) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ title: 'Unavailable', detail: 'Currencies unavailable' }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => MOCK_REWARD_CURRENCIES } as Response;
+    }
+
+    const valListMatch = url.match(/\/profiles\/([^/]+)\/valuations$/);
+    if (valListMatch && method === 'GET') {
+      if (!valuationsOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Error', detail: 'Valuations failed' }),
+        } as Response;
+      }
+      const slug = decodeURIComponent(valListMatch[1]);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => valuationsByProfile[slug] ?? [],
+      } as Response;
+    }
+
+    const valPutMatch = url.match(/\/profiles\/([^/]+)\/valuations\/([^/]+)$/);
+    if (valPutMatch && method === 'PUT') {
+      if (putStatus !== 200) {
+        return {
+          ok: false,
+          status: putStatus,
+          json: async () => ({
+            title: 'Unprocessable Entity',
+            status: putStatus,
+            detail: 'Validation failed.',
+            errors: [
+              {
+                loc: ['body', 'cents_per_unit'],
+                msg: 'Value rejected by server.',
+                type: 'value_error',
+              },
+            ],
+          }),
+        } as Response;
+      }
+      const slug = decodeURIComponent(valPutMatch[1]);
+      const code = decodeURIComponent(valPutMatch[2]);
+      const body = JSON.parse(String(init?.body ?? '{}')) as { cents_per_unit: string };
+      const currency =
+        MOCK_REWARD_CURRENCIES.find((c) => c.code === code) ?? MOCK_REWARD_CURRENCIES[0];
+      const updated = {
+        profile_id: slug === 'maya' ? 1 : 2,
+        reward_currency_id: currency.id,
+        reward_currency: currency,
+        cents_per_unit: body.cents_per_unit,
+        is_user_set: true,
+        updated_at: '2026-11-22T18:00:00Z',
+      };
+      const existingList = valuationsByProfile[slug] ?? [];
+      const filtered = existingList.filter((v) => v.reward_currency_id !== currency.id);
+      valuationsByProfile[slug] = [...filtered, updated];
+      return { ok: true, status: 200, json: async () => updated } as Response;
+    }
+
+    return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+  });
+}
+
+describe('T41 Settings / Valuations view', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('validates decimal valuation boundaries and rejects invalid inputs without floats', () => {
+    expect(parseValuationInput('0.0001')).toBe('0.0001');
+    expect(parseValuationInput('10')).toBe('10.0000');
+    expect(parseValuationInput('10.0000')).toBe('10.0000');
+    expect(parseValuationInput('1.5')).toBe('1.5000');
+    expect(parseValuationInput('001.25')).toBe('1.2500');
+    expect(parseValuationInput('.5')).toBe('0.5000');
+    expect(parseValuationInput('10.0001')).toBeNull();
+    expect(parseValuationInput('0')).toBeNull();
+    expect(parseValuationInput('0.0000')).toBeNull();
+    expect(parseValuationInput('-1')).toBeNull();
+    expect(parseValuationInput('1.12345')).toBeNull();
+    expect(parseValuationInput('1.')).toBeNull();
+    expect(parseValuationInput('abc')).toBeNull();
+    expect(parseValuationInput('')).toBeNull();
+  });
+
+  it('renders Illustrative default, User-configured, and Not configured states with reference hint', async () => {
+    mockT41Fetch();
+    render(<App initialEntries={['/settings']} />);
+
+    await screen.findByLabelText('Select demo profile');
+    expect(await screen.findByText('Illustrative default')).toBeInTheDocument();
+    const cashRow = screen.getByTestId('valuation-row-NW_CASH');
+    expect(within(cashRow).getByText('Illustrative default')).toBeInTheDocument();
+    expect(within(cashRow).getByLabelText(/Estimated cents per Northwind Cash unit/i)).toHaveValue(
+      '1.0000',
+    );
+
+    const pointsRow = screen.getByTestId('valuation-row-HORIZON_PTS');
+    expect(within(pointsRow).getByText('User-configured')).toBeInTheDocument();
+    expect(within(pointsRow).getByLabelText(/Estimated cents per Horizon Points unit/i)).toHaveValue(
+      '1.8000',
+    );
+
+    const milesRow = screen.getByTestId('valuation-row-SKY_MILES');
+    expect(
+      within(milesRow).getByText('Not configured (unranked in Compare)'),
+    ).toBeInTheDocument();
+    expect(within(milesRow).getByLabelText(/Estimated cents per Skyward Miles unit/i)).toHaveValue(
+      '',
+    );
+    expect(
+      within(milesRow).getByText(/Illustrative default reference: 1\.2000¢ \(not yet configured/),
+    ).toBeInTheDocument();
+  });
+
+  it('validates client-side range/precision, saves valuation to User-configured, and surfaces 422 errors', async () => {
+    const fetchSpy = mockT41Fetch();
+    render(<App initialEntries={['/settings']} />);
+
+    await screen.findByLabelText('Select demo profile');
+    await screen.findByText('Illustrative default');
+    const milesRow = screen.getByTestId('valuation-row-SKY_MILES');
+    const milesInput = within(milesRow).getByLabelText(/Estimated cents per Skyward Miles unit/i);
+
+    // Client-side invalid range (>10) -> no PUT
+    fireEvent.change(milesInput, { target: { value: '10.0001' } });
+    fireEvent.click(within(milesRow).getByRole('button', { name: 'Save' }));
+    expect(await within(milesRow).findByRole('alert')).toHaveTextContent(
+      'Enter a positive valuation greater than 0 and up to 10 cents per unit (max 4 decimal places).',
+    );
+    expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false);
+
+    // Valid save -> PUT + status flips to User-configured + profile invalidated
+    const initialValuationsFetches = fetchSpy.mock.calls.filter(
+      ([u, init]) => String(u).includes('/profiles/maya/valuations') && (!init?.method || init.method === 'GET'),
+    ).length;
+
+    fireEvent.change(milesInput, { target: { value: '1.75' } });
+    fireEvent.click(within(milesRow).getByRole('button', { name: 'Save' }));
+
+    expect(await within(milesRow).findByRole('status')).toHaveTextContent(
+      'Saved 1.7500¢ per Skyward Miles unit.',
+    );
+    expect(within(milesRow).getByText('User-configured')).toBeInTheDocument();
+
+    await waitFor(() => {
+      const valFetches = fetchSpy.mock.calls.filter(
+        ([u, init]) => String(u).includes('/profiles/maya/valuations') && (!init?.method || init.method === 'GET'),
+      ).length;
+      expect(valFetches).toBeGreaterThan(initialValuationsFetches);
+    });
+
+    // Server 422 error
+    mockT41Fetch({ putStatus: 422 });
+    fireEvent.change(milesInput, { target: { value: '2.0000' } });
+    fireEvent.click(within(milesRow).getByRole('button', { name: 'Save' }));
+    expect(await within(milesRow).findByRole('alert')).toHaveTextContent(
+      'Value rejected by server.',
+    );
+  });
+
+  it('clears drafts/feedback on profile switch and isolates in-flight PUT responses', async () => {
+    let resolveDeferredPut!: (res: Response) => void;
+    let mayaValFetches = 0;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+
+      if (url.endsWith('/healthz')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ status: 'ok' }),
+        } as Response);
+      }
+      if (url.endsWith('/profiles')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_PROFILES,
+        } as Response);
+      }
+      if (url.endsWith('/reward-currencies')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_REWARD_CURRENCIES,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/maya/valuations') && method === 'GET') {
+        mayaValFetches += 1;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              profile_id: 1,
+              reward_currency_id: 1,
+              reward_currency: MOCK_REWARD_CURRENCIES[0],
+              cents_per_unit: '1.0000',
+              is_user_set: false,
+              updated_at: '2026-11-20T00:00:00Z',
+            },
+          ],
+        } as Response);
+      }
+      if (url.endsWith('/profiles/dev/valuations') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [],
+        } as Response);
+      }
+      if (url.endsWith('/profiles/maya/valuations/NW_CASH') && method === 'PUT') {
+        return new Promise<Response>((resolve) => {
+          resolveDeferredPut = resolve;
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+        json: async () => ({ title: 'Not Found' }),
+      } as Response);
+    });
+
+    render(<App initialEntries={['/settings']} />);
+    await screen.findByLabelText('Select demo profile');
+    await screen.findByText('Illustrative default');
+    const cashRow = screen.getByTestId('valuation-row-NW_CASH');
+    const cashInput = within(cashRow).getByLabelText(/Estimated cents per Northwind Cash unit/i);
+
+    fireEvent.change(cashInput, { target: { value: '1.25' } });
+    fireEvent.click(within(cashRow).getByRole('button', { name: 'Save' }));
+    const initialMayaFetches = mayaValFetches;
+
+    // Switch to Dev while Maya's PUT is in flight
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    await waitFor(() => {
+      expect(
+        within(screen.getByTestId('valuation-row-NW_CASH')).getByText(
+          'Not configured (unranked in Compare)',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    const devCashInput = within(screen.getByTestId('valuation-row-NW_CASH')).getByLabelText(
+      /Estimated cents per Northwind Cash unit/i,
+    );
+    fireEvent.change(devCashInput, { target: { value: '1.90' } });
+
+    resolveDeferredPut({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        profile_id: 1,
+        reward_currency_id: 1,
+        reward_currency: MOCK_REWARD_CURRENCIES[0],
+        cents_per_unit: '1.2500',
+        is_user_set: true,
+        updated_at: '2026-11-22T18:00:00Z',
+      }),
+    } as Response);
+
+    await waitFor(() => {
+      expect(devCashInput).toHaveValue('1.90');
+    });
+    expect(screen.queryByText(/Saved 1\.2500¢/)).not.toBeInTheDocument();
+
+    // Switching back to Maya triggers refetch due to ['profile', 'maya'] invalidation
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'maya' } });
+    await waitFor(() => {
+      expect(mayaValFetches).toBeGreaterThan(initialMayaFetches);
+    });
+  });
+
+  it('handles empty profile list without profile requests and recovers on currency/valuation retry', async () => {
+    const emptyFetchSpy = mockT41Fetch({ profiles: [] });
+    const { unmount } = render(<App initialEntries={['/settings']} />);
+
+    expect(
+      await screen.findByText('Select a demo profile to view and edit currency valuations.'),
+    ).toBeInTheDocument();
+    const cashRow = await screen.findByTestId('valuation-row-NW_CASH');
+    expect(
+      within(cashRow).getByLabelText(/Estimated cents per Northwind Cash unit/i),
+    ).toBeDisabled();
+    expect(within(cashRow).getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(
+      emptyFetchSpy.mock.calls.some(([u]) => String(u).includes('/profiles/')),
+    ).toBe(false);
+    unmount();
+
+    // Error & Retry recovery for currencies and valuations
+    let failCurrencies = true;
+    let failValuations = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/reward-currencies')) {
+        if (failCurrencies) {
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ title: 'Unavailable', detail: 'Currencies error' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => MOCK_REWARD_CURRENCIES } as Response;
+      }
+      if (url.endsWith('/profiles/maya/valuations')) {
+        if (failValuations) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Error', detail: 'Valuations error' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => [] } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/settings']} />);
+    const retryCurrenciesBtn = await screen.findByRole('button', { name: 'Retry Currencies' });
+    failCurrencies = false;
+    fireEvent.click(retryCurrenciesBtn);
+
+    const retryValuationsBtn = await screen.findByRole('button', { name: 'Retry Valuations' });
+    failValuations = false;
+    fireEvent.click(retryValuationsBtn);
+
+    expect(await screen.findByTestId('valuation-row-NW_CASH')).toBeInTheDocument();
   });
 });

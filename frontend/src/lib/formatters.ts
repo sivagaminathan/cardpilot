@@ -61,3 +61,30 @@ export function getTodayLocalIsoDate(now: Date = new Date()): string {
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+const VALUATION_PATTERN = /^\s*(?:(\d+)(?:\.(\d{1,4}))?|\.(\d{1,4}))\s*$/;
+
+/**
+ * Parse a cents-per-unit valuation string strictly in 0 < v <= 10 with up to 4 decimal places.
+ * Uses integer scaling (x10000) without floating-point arithmetic and returns a normalized
+ * 4-decimal string (e.g. "1.5000") or null if invalid.
+ */
+export function parseValuationInput(raw: string): string | null {
+  const match = VALUATION_PATTERN.exec(raw);
+  if (!match) {
+    return null;
+  }
+  const dollarsStr = (match[1] ?? '0').replace(/^0+/, '') || '0';
+  if (dollarsStr.length > 2) {
+    return null;
+  }
+  const rawFrac = match[2] ?? match[3] ?? '';
+  const fracStr = rawFrac.padEnd(4, '0');
+  const dollars = Number.parseInt(dollarsStr, 10);
+  const frac = Number.parseInt(fracStr, 10);
+  const scaled = dollars * 10000 + frac;
+  if (scaled <= 0 || scaled > 100000) {
+    return null;
+  }
+  return `${dollars}.${fracStr}`;
+}
