@@ -3,6 +3,7 @@ import {
   ApiError,
   addProfileCard,
   createProfileTransaction,
+  deleteBenefitUsage,
   deleteProfileCard,
   deleteProfileTransaction,
   fetchCardProductRules,
@@ -17,6 +18,7 @@ import {
   fetchRewardCurrencies,
   fetchRewardsSummary,
   getApiBaseUrl,
+  logBenefitUsage,
   recommendCards,
   resetProfile,
   updateProfileCard,
@@ -616,6 +618,101 @@ describe('API client', () => {
         amount_cents: 4250,
         category_code: 'dining',
         occurred_on: '2026-11-22',
+        note: '4111111111111111',
+      }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      errors: [
+        {
+          loc: ['body', 'note'],
+          msg: 'Value must not contain 13-19 digit card numbers.',
+          type: 'value_error',
+        },
+      ],
+    });
+  });
+
+  it('logs and deletes benefit usages with 204 and 422 handling', async () => {
+    const deleteJsonSpy = vi.fn(async () => {
+      throw new Error('should not parse 204 body');
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 801,
+          profile_card_id: 101,
+          benefit_definition_id: 1,
+          amount_cents: 1000,
+          used_on: '2026-11-22',
+          note: 'Dinner',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: deleteJsonSpy,
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          title: 'Unprocessable Entity',
+          status: 422,
+          detail: 'Validation failed.',
+          errors: [
+            {
+              loc: ['body', 'note'],
+              msg: 'Value must not contain 13-19 digit card numbers.',
+              type: 'value_error',
+            },
+          ],
+        }),
+      } as Response);
+
+    const logged = await logBenefitUsage(
+      'maya/1',
+      1,
+      {
+        profile_card_id: 101,
+        amount_cents: 1000,
+        used_on: '2026-11-22',
+        note: 'Dinner',
+      },
+      'https://api.cardpilot.demo',
+    );
+    expect(logged.id).toBe(801);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://api.cardpilot.demo/api/v1/profiles/maya%2F1/benefits/1/usages',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          profile_card_id: 101,
+          amount_cents: 1000,
+          used_on: '2026-11-22',
+          note: 'Dinner',
+        }),
+      }),
+    );
+
+    await expect(deleteBenefitUsage('maya/1', 1, 801)).resolves.toBeUndefined();
+    expect(deleteJsonSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/profiles/maya%2F1/benefits/1/usages/801',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+
+    await expect(
+      logBenefitUsage('maya', 1, {
+        profile_card_id: 101,
+        amount_cents: 1000,
+        used_on: '2026-11-22',
         note: '4111111111111111',
       }),
     ).rejects.toMatchObject({

@@ -596,7 +596,9 @@ describe('CardPilot App Shell, Dashboard, Router, and Profile Picker', () => {
 
     fireEvent.click(screen.getByRole('link', { name: /^Dashboard$/i }));
     fireEvent.click(screen.getByRole('button', { name: 'View All Benefits' }));
-    expect(screen.getByRole('heading', { level: 2, name: /Benefits View/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Card Benefits & Usage Tracking/i }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: /^Dashboard$/i }));
     fireEvent.click(screen.getByRole('button', { name: 'View Full Rewards' }));
@@ -2969,5 +2971,502 @@ describe('T42 Transactions view', () => {
     failTx = false;
     fireEvent.click(retryTxBtn);
     expect(await screen.findByText('$50.00 at Harbor Bistro')).toBeInTheDocument();
+  });
+});
+
+const MOCK_T43_BENEFITS_MAYA = [
+  {
+    benefit_id: 1,
+    profile_card_id: 101,
+    card_name: 'Daily Cash',
+    card_product_id: 1,
+    card_product_name: 'Northwind Cash Everyday',
+    name: 'Monthly Dining Credit',
+    benefit_type: 'credit',
+    value_cents: 1500,
+    reset_period: 'monthly',
+    notes: 'Eligible dining purchases',
+    period_start: '2026-11-01',
+    period_end: '2026-11-30',
+    next_reset_date: '2026-12-01',
+    days_until_reset: 10,
+    used_cents: 500,
+    remaining_cents: 1000,
+    over_used_cents: 0,
+    is_over_used: false,
+    usage_count: 1,
+    status: 'partially_used',
+    usages: [
+      {
+        id: 801,
+        profile_card_id: 101,
+        benefit_definition_id: 1,
+        amount_cents: 500,
+        used_on: '2026-11-10',
+        note: 'Cafe lunch',
+      },
+    ],
+  },
+  {
+    benefit_id: 2,
+    profile_card_id: 102,
+    card_name: 'Skyward Explorer',
+    card_product_id: 2,
+    card_product_name: 'Skyward Miles Explorer',
+    name: 'Priority Boarding Perk',
+    benefit_type: 'perk',
+    value_cents: null,
+    reset_period: 'card_year',
+    notes: 'Annual airline perk',
+    period_start: null,
+    period_end: null,
+    next_reset_date: null,
+    days_until_reset: null,
+    used_cents: null,
+    remaining_cents: null,
+    over_used_cents: null,
+    is_over_used: false,
+    usage_count: 0,
+    status: 'unused',
+    usages: [],
+  },
+  {
+    benefit_id: 3,
+    profile_card_id: 101,
+    card_name: 'Daily Cash',
+    card_product_id: 1,
+    card_product_name: 'Northwind Cash Everyday',
+    name: 'Streaming Credit',
+    benefit_type: 'credit',
+    value_cents: 1000,
+    reset_period: 'monthly',
+    notes: 'Monthly streaming',
+    period_start: '2026-11-01',
+    period_end: '2026-11-30',
+    next_reset_date: '2026-12-01',
+    days_until_reset: 1,
+    used_cents: 1200,
+    remaining_cents: -200,
+    over_used_cents: 200,
+    is_over_used: true,
+    usage_count: 1,
+    status: 'over_used',
+    usages: [
+      {
+        id: 802,
+        profile_card_id: 101,
+        benefit_definition_id: 3,
+        amount_cents: 1200,
+        used_on: '2026-11-05',
+        note: 'Streaming bundle',
+      },
+    ],
+  },
+];
+
+const MOCK_T43_BENEFITS_DEV = [
+  {
+    benefit_id: 4,
+    profile_card_id: 201,
+    card_name: 'Summit Points',
+    card_product_id: 3,
+    card_product_name: 'Horizon Summit Points',
+    name: 'Travel Credit',
+    benefit_type: 'credit',
+    value_cents: 25000,
+    reset_period: 'calendar_year',
+    notes: 'Annual travel credit',
+    period_start: '2026-01-01',
+    period_end: '2026-12-31',
+    next_reset_date: '2027-01-01',
+    days_until_reset: 40,
+    used_cents: 0,
+    remaining_cents: 25000,
+    over_used_cents: 0,
+    is_over_used: false,
+    usage_count: 0,
+    status: 'unused',
+    usages: [],
+  },
+];
+
+function mockT43Fetch(options?: {
+  profiles?: typeof MOCK_PROFILES;
+  benefitsOk?: boolean;
+  emptyBenefits?: boolean;
+  logStatus?: number;
+  deleteOk?: boolean;
+}) {
+  const profiles = options?.profiles ?? MOCK_PROFILES;
+  const benefitsOk = options?.benefitsOk ?? true;
+  const emptyBenefits = options?.emptyBenefits ?? false;
+  const logStatus = options?.logStatus ?? 201;
+  const deleteOk = options?.deleteOk ?? true;
+
+  const benefitsByProfile: Record<string, Array<Record<string, unknown>>> = {
+    maya: JSON.parse(JSON.stringify(MOCK_T43_BENEFITS_MAYA)),
+    dev: JSON.parse(JSON.stringify(MOCK_T43_BENEFITS_DEV)),
+  };
+  let nextUsageId = 900;
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? 'GET';
+
+    if (url.endsWith('/healthz')) {
+      return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+    }
+    if (url.endsWith('/profiles') && method === 'GET') {
+      return { ok: true, status: 200, json: async () => profiles } as Response;
+    }
+
+    const listMatch = url.match(/\/profiles\/([^/]+)\/benefits$/);
+    if (listMatch && method === 'GET') {
+      if (!benefitsOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Error', detail: 'Benefits failed' }),
+        } as Response;
+      }
+      const slug = decodeURIComponent(listMatch[1]);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => (emptyBenefits ? [] : (benefitsByProfile[slug] ?? [])),
+      } as Response;
+    }
+
+    const postMatch = url.match(/\/profiles\/([^/]+)\/benefits\/(\d+)\/usages$/);
+    if (postMatch && method === 'POST') {
+      if (logStatus !== 201) {
+        return {
+          ok: false,
+          status: logStatus,
+          json: async () => ({
+            title: 'Unprocessable Entity',
+            status: logStatus,
+            detail: 'Validation failed.',
+            errors: [
+              {
+                loc: ['body', 'note'],
+                msg: 'Value must not contain 13-19 digit card numbers.',
+                type: 'value_error',
+              },
+            ],
+          }),
+        } as Response;
+      }
+      const slug = decodeURIComponent(postMatch[1]);
+      const benefitId = Number(postMatch[2]);
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        profile_card_id: number;
+        amount_cents: number | null;
+        used_on: string;
+        note?: string;
+      };
+      const created = {
+        id: nextUsageId++,
+        profile_card_id: body.profile_card_id,
+        benefit_definition_id: benefitId,
+        amount_cents: body.amount_cents,
+        used_on: body.used_on,
+        note: body.note ?? '',
+      };
+      const target = (benefitsByProfile[slug] ?? []).find(
+        (b) => b.benefit_id === benefitId && b.profile_card_id === body.profile_card_id,
+      );
+      if (target) {
+        target.usages = [...(target.usages as unknown[]), created];
+      }
+      return { ok: true, status: 201, json: async () => created } as Response;
+    }
+
+    const deleteMatch = url.match(/\/profiles\/([^/]+)\/benefits\/(\d+)\/usages\/(\d+)$/);
+    if (deleteMatch && method === 'DELETE') {
+      if (!deleteOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Error', detail: 'Delete usage failed.' }),
+        } as Response;
+      }
+      const slug = decodeURIComponent(deleteMatch[1]);
+      const usageId = Number(deleteMatch[3]);
+      for (const b of benefitsByProfile[slug] ?? []) {
+        b.usages = (b.usages as Array<{ id: number }>).filter((u) => u.id !== usageId);
+      }
+      return { ok: true, status: 204 } as Response;
+    }
+
+    return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+  });
+}
+
+describe('T43 Benefits view', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders statuses, overused/negative remaining, null reset dates, and singular/plural day counts', async () => {
+    mockT43Fetch();
+    render(<App initialEntries={['/benefits']} />);
+
+    const diningCard = await screen.findByTestId('benefit-card-101-1');
+    expect(within(diningCard).getByText('Status: Partially used')).toBeInTheDocument();
+    expect(within(diningCard).getByText('2026-12-01 (10 days left)')).toBeInTheDocument();
+    expect(within(diningCard).getByTestId('benefit-usage-item-801')).toHaveTextContent(
+      /2026-11-10 — \$5\.00 \(Cafe lunch\)/,
+    );
+
+    const perkCard = screen.getByTestId('benefit-card-102-2');
+    expect(within(perkCard).getByText('Status: Unused')).toBeInTheDocument();
+    expect(within(perkCard).getByText('Period unavailable')).toBeInTheDocument();
+    expect(within(perkCard).getByText('Reset date unavailable')).toBeInTheDocument();
+
+    const overusedCard = screen.getByTestId('benefit-card-101-3');
+    expect(within(overusedCard).getByText('Status: Overused')).toBeInTheDocument();
+    expect(within(overusedCard).getByText('-$2.00')).toBeInTheDocument();
+    expect(within(overusedCard).getByText('Overused by $2.00')).toBeInTheDocument();
+    expect(within(overusedCard).getByText('2026-12-01 (1 day left)')).toBeInTheDocument();
+  });
+
+  it('logs monetary and non-monetary perk usages, validates USD, and surfaces 422 sensitive-data errors', async () => {
+    const fetchSpy = mockT43Fetch();
+    render(<App initialEntries={['/benefits']} />);
+
+    const diningCard = await screen.findByTestId('benefit-card-101-1');
+    const noteInput = within(diningCard).getByLabelText('Note (optional)');
+    expect(noteInput).toHaveAttribute('aria-describedby', 'benefit-note-hint-101:1');
+    expect(
+      within(diningCard).getByText('Do not enter real card numbers or sensitive data.'),
+    ).toBeInTheDocument();
+
+    // Invalid USD -> no POST
+    fireEvent.change(within(diningCard).getByLabelText('Usage Amount (USD)'), {
+      target: { value: '0' },
+    });
+    fireEvent.click(within(diningCard).getByRole('button', { name: 'Log Usage' }));
+    expect(await within(diningCard).findByRole('alert')).toHaveTextContent(
+      'Enter a positive USD amount with up to two decimal places',
+    );
+    expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+
+    // Valid monetary log
+    fireEvent.change(within(diningCard).getByLabelText('Usage Amount (USD)'), {
+      target: { value: '10.00' },
+    });
+    fireEvent.change(noteInput, { target: { value: 'Bistro' } });
+    fireEvent.click(within(diningCard).getByRole('button', { name: 'Log Usage' }));
+    expect(await within(diningCard).findByRole('status')).toHaveTextContent(
+      /Logged \$10\.00 usage/,
+    );
+
+    // Non-monetary perk log -> sends amount_cents: null
+    const perkCard = screen.getByTestId('benefit-card-102-2');
+    expect(within(perkCard).queryByLabelText('Usage Amount (USD)')).not.toBeInTheDocument();
+    fireEvent.click(within(perkCard).getByRole('button', { name: 'Log Usage' }));
+    expect(await within(perkCard).findByRole('status')).toHaveTextContent(/Logged perk usage/);
+
+    const posts = fetchSpy.mock.calls.filter(([, init]) => init?.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(String(posts[1]?.[1]?.body))).toMatchObject({
+      profile_card_id: 102,
+      amount_cents: null,
+    });
+
+    // Server 422 sensitive-data error
+    mockT43Fetch({ logStatus: 422 });
+    fireEvent.change(within(diningCard).getByLabelText('Usage Amount (USD)'), {
+      target: { value: '5.00' },
+    });
+    fireEvent.change(noteInput, { target: { value: '4111111111111111' } });
+    fireEvent.click(within(diningCard).getByRole('button', { name: 'Log Usage' }));
+    expect(await within(diningCard).findByRole('alert')).toHaveTextContent(
+      'Value must not contain 13-19 digit card numbers.',
+    );
+  });
+
+  it('handles usage deletion confirmation, cancellation, success, and failure', async () => {
+    mockT43Fetch({ deleteOk: true });
+    const { unmount } = render(<App initialEntries={['/benefits']} />);
+
+    const usageRow = await screen.findByTestId('benefit-usage-item-801');
+    fireEvent.click(within(usageRow).getByRole('button', { name: 'Remove' }));
+    expect(
+      within(usageRow).getByRole('group', { name: 'Confirm removal of usage 801' }),
+    ).toBeInTheDocument();
+    fireEvent.click(within(usageRow).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByTestId('benefit-usage-item-801')).toBeInTheDocument();
+
+    fireEvent.click(within(usageRow).getByRole('button', { name: 'Remove' }));
+    fireEvent.click(within(usageRow).getByRole('button', { name: 'Confirm Remove' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('benefit-usage-item-801')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Removed benefit usage entry.')).toBeInTheDocument();
+    unmount();
+
+    mockT43Fetch({ deleteOk: false });
+    render(<App initialEntries={['/benefits']} />);
+    const failUsageRow = await screen.findByTestId('benefit-usage-item-801');
+    fireEvent.click(within(failUsageRow).getByRole('button', { name: 'Remove' }));
+    fireEvent.click(within(failUsageRow).getByRole('button', { name: 'Confirm Remove' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete usage failed.');
+    expect(screen.getByTestId('benefit-usage-item-801')).toBeInTheDocument();
+  });
+
+  it('isolates deferred log and delete mutations across profile switches', async () => {
+    let resolveDeferredPost!: (res: Response) => void;
+    let resolveDeferredDelete!: (res: Response) => void;
+    let mayaBenefitFetches = 0;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/healthz')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response);
+      }
+      if (url.endsWith('/profiles')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_PROFILES } as Response);
+      }
+      if (url.endsWith('/profiles/maya/benefits') && method === 'GET') {
+        mayaBenefitFetches += 1;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_T43_BENEFITS_MAYA,
+        } as Response);
+      }
+      if (url.endsWith('/profiles/dev/benefits') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_T43_BENEFITS_DEV,
+        } as Response);
+      }
+      if (url.includes('/profiles/maya/benefits/') && method === 'POST') {
+        return new Promise<Response>((resolve) => {
+          resolveDeferredPost = resolve;
+        });
+      }
+      if (url.includes('/profiles/maya/benefits/') && method === 'DELETE') {
+        return new Promise<Response>((resolve) => {
+          resolveDeferredDelete = resolve;
+        });
+      }
+      return Promise.resolve({ ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response);
+    });
+
+    // Deferred log mutation across profile switch
+    const { unmount } = render(<App initialEntries={['/benefits']} />);
+    const diningCard = await screen.findByTestId('benefit-card-101-1');
+    const initialMayaFetches = mayaBenefitFetches;
+
+    fireEvent.change(within(diningCard).getByLabelText('Usage Amount (USD)'), {
+      target: { value: '10.00' },
+    });
+    fireEvent.click(within(diningCard).getByRole('button', { name: 'Log Usage' }));
+
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    expect(await screen.findByTestId('benefit-card-201-4')).toBeInTheDocument();
+
+    resolveDeferredPost({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        id: 950,
+        profile_card_id: 101,
+        benefit_definition_id: 1,
+        amount_cents: 1000,
+        used_on: '2026-11-22',
+        note: '',
+      }),
+    } as Response);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Logged \$10\.00 usage/)).not.toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'maya' } });
+    await waitFor(() => {
+      expect(mayaBenefitFetches).toBeGreaterThan(initialMayaFetches);
+    });
+    unmount();
+
+    // Deferred delete mutation across profile switch
+    mayaBenefitFetches = 0;
+    render(<App initialEntries={['/benefits']} />);
+    const usageRow = await screen.findByTestId('benefit-usage-item-801');
+    const fetchesBeforeDelete = mayaBenefitFetches;
+
+    fireEvent.click(within(usageRow).getByRole('button', { name: 'Remove' }));
+    fireEvent.click(within(usageRow).getByRole('button', { name: 'Confirm Remove' }));
+
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    expect(await screen.findByTestId('benefit-card-201-4')).toBeInTheDocument();
+
+    resolveDeferredDelete({ ok: true, status: 204 } as Response);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Removed benefit usage entry.')).not.toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'maya' } });
+    await waitFor(() => {
+      expect(mayaBenefitFetches).toBeGreaterThan(fetchesBeforeDelete);
+    });
+  });
+
+  it('handles empty profiles, empty benefits, and error/retry recovery', async () => {
+    const emptyFetchSpy = mockT43Fetch({ profiles: [] });
+    const { unmount } = render(<App initialEntries={['/benefits']} />);
+    expect(
+      await screen.findByText('Select a demo profile to view and log card benefits.'),
+    ).toBeInTheDocument();
+    expect(
+      emptyFetchSpy.mock.calls.some(([u]) => String(u).includes('/profiles/')),
+    ).toBe(false);
+    unmount();
+
+    mockT43Fetch({ emptyBenefits: true });
+    const { unmount: unmountEmptyBenefits } = render(<App initialEntries={['/benefits']} />);
+    expect(
+      await screen.findByText("No benefits defined for this profile's active cards."),
+    ).toBeInTheDocument();
+    unmountEmptyBenefits();
+
+    let failBenefits = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/profiles/maya/benefits')) {
+        if (failBenefits) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Error', detail: 'Benefits fetch failed' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => MOCK_T43_BENEFITS_MAYA } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/benefits']} />);
+    const retryBtn = await screen.findByRole('button', { name: 'Retry Benefits' });
+    failBenefits = false;
+    fireEvent.click(retryBtn);
+    expect(await screen.findByTestId('benefit-card-101-1')).toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import { Link, MemoryRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { ApiError, fetchProfiles, resetProfile } from './api/client';
+import { BenefitsView } from './components/BenefitsView';
 import { CardsView } from './components/CardsView';
 import { CompareView } from './components/CompareView';
 import { Dashboard } from './components/Dashboard';
@@ -121,15 +122,7 @@ export const AppShell: React.FC<AppShellProps> = ({ rulesReferenceDate }) => {
           <Route path="/cards" element={<CardsView profileId={activeProfileKey} />} />
           <Route path="/compare" element={<CompareView profileId={activeProfileKey} />} />
           <Route path="/transactions" element={<TransactionsView profileId={activeProfileKey} />} />
-          <Route
-            path="/benefits"
-            element={
-              <PlaceholderPage
-                title="Benefits View"
-                description="Benefit status and usage logging are scheduled for T43."
-              />
-            }
-          />
+          <Route path="/benefits" element={<BenefitsView profileId={activeProfileKey} />} />
           <Route
             path="/rewards"
             element={

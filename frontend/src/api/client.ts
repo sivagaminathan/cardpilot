@@ -17,6 +17,8 @@ export type RecommendationResponse = components['schemas']['RecommendationRespon
 export type CardRecommendationItem = components['schemas']['CardRecommendationItem'];
 export type AppliedPortionSchema = components['schemas']['AppliedPortionSchema'];
 export type BenefitStatusItem = components['schemas']['BenefitStatusItem'];
+export type BenefitUsageCreate = components['schemas']['BenefitUsageCreate'];
+export type BenefitUsageSummary = components['schemas']['BenefitUsageSummary'];
 export type RewardsSummaryResponse = components['schemas']['RewardsSummaryResponse'];
 export type TransactionCreate = components['schemas']['TransactionCreate'];
 export type TransactionSummary = components['schemas']['TransactionSummary'];
@@ -350,6 +352,35 @@ export async function deleteProfileTransaction(
 ): Promise<void> {
   return apiRequest<void>(
     `/profiles/${encodeURIComponent(profileKey)}/transactions/${encodeURIComponent(String(transactionId))}`,
+    { method: 'DELETE' },
+    baseUrl,
+  );
+}
+
+export async function logBenefitUsage(
+  profileKey: string,
+  benefitId: number,
+  payload: BenefitUsageCreate,
+  baseUrl?: string,
+): Promise<BenefitUsageSummary> {
+  return apiRequest<BenefitUsageSummary>(
+    `/profiles/${encodeURIComponent(profileKey)}/benefits/${encodeURIComponent(String(benefitId))}/usages`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    baseUrl,
+  );
+}
+
+export async function deleteBenefitUsage(
+  profileKey: string,
+  benefitId: number,
+  usageId: number,
+  baseUrl?: string,
+): Promise<void> {
+  return apiRequest<void>(
+    `/profiles/${encodeURIComponent(profileKey)}/benefits/${encodeURIComponent(String(benefitId))}/usages/${encodeURIComponent(String(usageId))}`,
     { method: 'DELETE' },
     baseUrl,
   );
