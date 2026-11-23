@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { Link, MemoryRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { ApiError, fetchProfiles, resetProfile } from './api/client';
 import { BenefitsView } from './components/BenefitsView';
 import { CardsView } from './components/CardsView';
@@ -14,24 +14,10 @@ import { CompareView } from './components/CompareView';
 import { Dashboard } from './components/Dashboard';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { Header, type ResetFeedback } from './components/Header';
+import { RewardsView } from './components/RewardsView';
 import { RulesView } from './components/RulesView';
 import { SettingsView } from './components/SettingsView';
 import { TransactionsView } from './components/TransactionsView';
-
-interface PlaceholderPageProps {
-  title: string;
-  description: string;
-}
-
-const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, description }) => (
-  <section className="section-card placeholder-card">
-    <h2 className="section-title">{title}</h2>
-    <p className="placeholder-text">{description}</p>
-    <Link to="/" className="btn btn-primary">
-      Return to Dashboard
-    </Link>
-  </section>
-);
 
 interface AppShellProps {
   rulesReferenceDate?: Date | string;
@@ -123,15 +109,7 @@ export const AppShell: React.FC<AppShellProps> = ({ rulesReferenceDate }) => {
           <Route path="/compare" element={<CompareView profileId={activeProfileKey} />} />
           <Route path="/transactions" element={<TransactionsView profileId={activeProfileKey} />} />
           <Route path="/benefits" element={<BenefitsView profileId={activeProfileKey} />} />
-          <Route
-            path="/rewards"
-            element={
-              <PlaceholderPage
-                title="Rewards View"
-                description="Per-currency rewards summary is scheduled for T44."
-              />
-            }
-          />
+          <Route path="/rewards" element={<RewardsView profileId={activeProfileKey} />} />
           <Route path="/settings" element={<SettingsView profileId={activeProfileKey} />} />
           <Route path="/rules" element={<RulesView referenceDate={rulesReferenceDate} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

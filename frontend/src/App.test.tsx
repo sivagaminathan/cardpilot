@@ -602,7 +602,9 @@ describe('CardPilot App Shell, Dashboard, Router, and Profile Picker', () => {
 
     fireEvent.click(screen.getByRole('link', { name: /^Dashboard$/i }));
     fireEvent.click(screen.getByRole('button', { name: 'View Full Rewards' }));
-    expect(screen.getByRole('heading', { level: 2, name: /Rewards View/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Earned Rewards by Currency/i }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: /^Compare$/i }));
     expect(
@@ -3468,5 +3470,290 @@ describe('T43 Benefits view', () => {
     failBenefits = false;
     fireEvent.click(retryBtn);
     expect(await screen.findByTestId('benefit-card-101-1')).toBeInTheDocument();
+  });
+});
+
+const MOCK_T44_SUMMARY_MAYA = {
+  profile_id: 1,
+  profile_slug: 'maya',
+  currencies: [
+    {
+      reward_currency_id: 1,
+      reward_currency_code: 'NW_CASH',
+      reward_currency_name: 'Northwind Cash',
+      reward_currency_kind: 'cash_back',
+      total_reward_units: '1.3000',
+      transaction_count: 2,
+      is_valued: true,
+      valuation_status: 'valued',
+      current_cents_per_unit: '1.0000',
+      is_user_set: false,
+      estimated_value_cents: 130,
+      limitation_note: null,
+    },
+    {
+      reward_currency_id: 2,
+      reward_currency_code: 'HORIZON_PTS',
+      reward_currency_name: 'Horizon Points',
+      reward_currency_kind: 'points',
+      total_reward_units: '500.0000',
+      transaction_count: 1,
+      is_valued: true,
+      valuation_status: 'valued',
+      current_cents_per_unit: '1.5000',
+      is_user_set: true,
+      estimated_value_cents: 750,
+      limitation_note: null,
+    },
+    {
+      reward_currency_id: 3,
+      reward_currency_code: 'SKY_MILES',
+      reward_currency_name: 'Skyward Miles',
+      reward_currency_kind: 'miles',
+      total_reward_units: '400.0000',
+      transaction_count: 1,
+      is_valued: false,
+      valuation_status: 'unvalued',
+      current_cents_per_unit: null,
+      is_user_set: null,
+      estimated_value_cents: null,
+      limitation_note: 'No valuation configured for Skyward Miles.',
+    },
+  ],
+  estimated_total_usd_cents: 880,
+  estimated_total_label:
+    'Estimated USD value based on current valuations (excludes unvalued currencies)',
+  excluded_unvalued_currency_codes: ['SKY_MILES'],
+  limitation_message: 'Excluded unvalued currencies from estimated USD total: SKY_MILES.',
+};
+
+const MOCK_T44_SUMMARY_NONE_VALUED = {
+  profile_id: 1,
+  profile_slug: 'maya',
+  currencies: [
+    {
+      reward_currency_id: 3,
+      reward_currency_code: 'SKY_MILES',
+      reward_currency_name: 'Skyward Miles',
+      reward_currency_kind: 'miles',
+      total_reward_units: '400.0000',
+      transaction_count: 1,
+      is_valued: false,
+      valuation_status: 'unvalued',
+      current_cents_per_unit: null,
+      is_user_set: null,
+      estimated_value_cents: null,
+      limitation_note: 'No valuation configured for Skyward Miles.',
+    },
+  ],
+  estimated_total_usd_cents: 0,
+  estimated_total_label:
+    'Estimated USD value based on current valuations (excludes unvalued currencies)',
+  excluded_unvalued_currency_codes: ['SKY_MILES'],
+  limitation_message: 'Excluded unvalued currencies from estimated USD total: SKY_MILES.',
+};
+
+const MOCK_T44_SUMMARY_DEV = {
+  profile_id: 2,
+  profile_slug: 'dev',
+  currencies: [
+    {
+      reward_currency_id: 4,
+      reward_currency_code: 'DEV_PTS',
+      reward_currency_name: 'Dev Points',
+      reward_currency_kind: 'points',
+      total_reward_units: '250.0000',
+      transaction_count: 1,
+      is_valued: true,
+      valuation_status: 'valued',
+      current_cents_per_unit: '2.0000',
+      is_user_set: true,
+      estimated_value_cents: 500,
+      limitation_note: null,
+    },
+  ],
+  estimated_total_usd_cents: 500,
+  estimated_total_label:
+    'Estimated USD value based on current valuations (excludes unvalued currencies)',
+  excluded_unvalued_currency_codes: [],
+  limitation_message: null,
+};
+
+function mockT44Fetch(options?: {
+  profiles?: typeof MOCK_PROFILES;
+  summaryOk?: boolean;
+  mayaSummary?: typeof MOCK_T44_SUMMARY_MAYA | typeof MOCK_T44_SUMMARY_NONE_VALUED;
+  emptySummary?: boolean;
+}) {
+  const profiles = options?.profiles ?? MOCK_PROFILES;
+  const summaryOk = options?.summaryOk ?? true;
+  const mayaSummary = options?.mayaSummary ?? MOCK_T44_SUMMARY_MAYA;
+  const emptySummary = options?.emptySummary ?? false;
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.endsWith('/healthz')) {
+      return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+    }
+    if (url.endsWith('/profiles')) {
+      return { ok: true, status: 200, json: async () => profiles } as Response;
+    }
+    const match = url.match(/\/profiles\/([^/]+)\/rewards\/summary$/);
+    if (match) {
+      if (!summaryOk) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ title: 'Error', detail: 'Summary failed' }),
+        } as Response;
+      }
+      const slug = decodeURIComponent(match[1]);
+      if (emptySummary) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            profile_id: slug === 'maya' ? 1 : 2,
+            profile_slug: slug,
+            currencies: [],
+            estimated_total_usd_cents: 0,
+            estimated_total_label: 'Estimated USD value',
+            excluded_unvalued_currency_codes: [],
+            limitation_message: null,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => (slug === 'dev' ? MOCK_T44_SUMMARY_DEV : mayaSummary),
+      } as Response;
+    }
+    return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+  });
+}
+
+describe('T44 Rewards view', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders separate per-currency table and estimated USD section with valued and unvalued currencies', async () => {
+    mockT44Fetch();
+    render(<App initialEntries={['/rewards']} />);
+
+    const table = await screen.findByRole('table', { name: /Earned Rewards by Currency/i });
+    expect(within(table).getByTestId('rewards-row-NW_CASH')).toHaveTextContent(
+      'Illustrative default (1.0000¢/unit)',
+    );
+    expect(within(table).getByTestId('rewards-row-HORIZON_PTS')).toHaveTextContent(
+      'User-configured (1.5000¢/unit)',
+    );
+    expect(within(table).getByTestId('rewards-row-SKY_MILES')).toHaveTextContent('Unvalued');
+    expect(
+      screen.getByText(/Raw reward units are grouped strictly by currency and are never combined/),
+    ).toBeInTheDocument();
+
+    // Separate Estimated USD Value section
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Estimated USD Value/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('rewards-estimate-NW_CASH')).toHaveTextContent('$1.30');
+    expect(screen.getByTestId('rewards-estimate-HORIZON_PTS')).toHaveTextContent('$7.50');
+
+    const unvaluedEstimate = screen.getByTestId('rewards-estimate-SKY_MILES');
+    expect(unvaluedEstimate).toHaveTextContent('Unvalued — excluded from estimate');
+    expect(unvaluedEstimate).toHaveTextContent('No valuation configured for Skyward Miles.');
+    expect(unvaluedEstimate).not.toHaveTextContent('$0.00');
+
+    expect(screen.getByText('$8.80')).toBeInTheDocument();
+    expect(
+      screen.getByText('Excluded unvalued currencies from estimated USD total: SKY_MILES.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Excluded unvalued currencies: SKY_MILES')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Manage Valuations' })).toHaveAttribute(
+      'href',
+      '/settings',
+    );
+    expect(screen.getByRole('link', { name: 'View Transactions' })).toHaveAttribute(
+      'href',
+      '/transactions',
+    );
+  });
+
+  it('does not misleadingly display $0.00 when no currencies have a valuation', async () => {
+    mockT44Fetch({ mayaSummary: MOCK_T44_SUMMARY_NONE_VALUED });
+    render(<App initialEntries={['/rewards']} />);
+
+    expect(
+      await screen.findByText('Estimated total unavailable — no currencies have a valuation.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+  });
+
+  it('handles empty rewards summary, no-profile state, error/retry recovery, and profile-switch isolation', async () => {
+    mockT44Fetch({ emptySummary: true });
+    const { unmount } = render(<App initialEntries={['/rewards']} />);
+    expect(
+      await screen.findByText(/No rewards earned yet for this profile/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: /Estimated USD Value/i }),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    // No-profile state -> zero profile requests
+    const emptyFetchSpy = mockT44Fetch({ profiles: [] });
+    const { unmount: unmountNoProfile } = render(<App initialEntries={['/rewards']} />);
+    expect(
+      await screen.findByText('Select a demo profile to view earned rewards.'),
+    ).toBeInTheDocument();
+    expect(
+      emptyFetchSpy.mock.calls.some(([u]) => String(u).includes('/profiles/')),
+    ).toBe(false);
+    unmountNoProfile();
+
+    // Error & Retry recovery + profile switch
+    let failSummary = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/profiles/maya/rewards/summary')) {
+        if (failSummary) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ title: 'Error', detail: 'Summary error' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => MOCK_T44_SUMMARY_MAYA } as Response;
+      }
+      if (url.endsWith('/profiles/dev/rewards/summary')) {
+        return { ok: true, status: 200, json: async () => MOCK_T44_SUMMARY_DEV } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/rewards']} />);
+    const retryBtn = await screen.findByRole('button', { name: 'Retry Rewards Summary' });
+    failSummary = false;
+    fireEvent.click(retryBtn);
+    expect(await screen.findByTestId('rewards-row-NW_CASH')).toBeInTheDocument();
+
+    // Switch to Dev -> Maya's data does not remain visible
+    fireEvent.change(screen.getByLabelText('Select demo profile'), { target: { value: 'dev' } });
+    expect(await screen.findByTestId('rewards-row-DEV_PTS')).toBeInTheDocument();
+    expect(screen.queryByTestId('rewards-row-NW_CASH')).not.toBeInTheDocument();
   });
 });

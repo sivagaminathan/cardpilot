@@ -19,6 +19,7 @@ export type AppliedPortionSchema = components['schemas']['AppliedPortionSchema']
 export type BenefitStatusItem = components['schemas']['BenefitStatusItem'];
 export type BenefitUsageCreate = components['schemas']['BenefitUsageCreate'];
 export type BenefitUsageSummary = components['schemas']['BenefitUsageSummary'];
+export type CurrencyRewardSummary = components['schemas']['CurrencyRewardSummary'];
 export type RewardsSummaryResponse = components['schemas']['RewardsSummaryResponse'];
 export type TransactionCreate = components['schemas']['TransactionCreate'];
 export type TransactionSummary = components['schemas']['TransactionSummary'];
