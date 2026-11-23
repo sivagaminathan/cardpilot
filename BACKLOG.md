@@ -57,22 +57,22 @@ Conventions
 - [x] **T34** Rewards summary endpoint (per-currency units; separate estimated USD). [AC-10]
 - [x] **T35** Error format (problem details), CORS, security headers, rate limit on mutations.
 - [x] **T36** OpenAPI 3.1 export script + CI diff check; TS type generation script. [AC-14]
-- [ ] **Gate G3:** human demo of API via Swagger UI/curl; confirm contract before UI.
+- [x] **Gate G3:** human demo of API via Swagger UI/curl; confirm contract before UI.
 
 ## Phase 4 — Frontend [FR-1…FR-31, AC-17]
-- [ ] **T37** API client + generated types + app shell, router, layout, disclaimer banner, profile picker.
-- [ ] **T38** Dashboard: cards list + benefit alerts + rewards snapshot.
-- [ ] **T39** Cards page: add/remove from catalog; rules viewer with sources/dates/staleness flag.
-- [ ] **T40** Compare page: form, ranked/unranked/ineligible rendering, explanation expand/collapse, warnings.
-- [ ] **T41** Settings: valuations editor with "illustrative default" labels.
-- [ ] **T42** Transactions page: create/list/filter/delete with reward result display.
-- [ ] **T43** Benefits page: status, usage logging, reset dates.
-- [ ] **T44** Rewards page: per-currency table + estimated value section (clearly separated).
-- [ ] **T45** Empty/loading/error states; accessibility pass (labels, focus, contrast); component tests for each page's main flow.
-- [ ] **Gate G4:** human walks through J1–J7 locally.
+- [x] **T37** API client + generated types + app shell, router, layout, disclaimer banner, profile picker.
+- [x] **T38** Dashboard: cards list + benefit alerts + rewards snapshot.
+- [x] **T39** Cards page: add/remove from catalog; rules viewer with sources/dates/staleness flag.
+- [x] **T40** Compare page: form, ranked/unranked/ineligible rendering, explanation expand/collapse, warnings.
+- [x] **T41** Settings: valuations editor with "illustrative default" labels.
+- [x] **T42** Transactions page: create/list/filter/delete with reward result display.
+- [x] **T43** Benefits page: status, usage logging, reset dates.
+- [x] **T44** Rewards page: per-currency table + estimated value section (clearly separated).
+- [x] **T45** Empty/loading/error states; accessibility pass (labels, focus, contrast); component tests for each page's main flow.
+- [x] **Gate G4:** human walks through J1–J7 locally.
 
 ## Phase 5 — E2E and quality hardening
-- [ ] **T46** Playwright setup + deterministic reset-before-test fixture.
+- [x] **T46** Playwright setup + deterministic reset-before-test fixture.
 - [ ] **T47** E2E specs: compare (ranked+unranked), add transaction → summary, valuation change → reorder, benefit usage.
 - [ ] **T48** CI e2e job + trace artifacts; security job (pip-audit, npm audit, gitleaks).
 - [ ] **T49** QA review pass: re-run ACs checklist; fix gaps; log results (actual) in `docs/dev-log.md`.
