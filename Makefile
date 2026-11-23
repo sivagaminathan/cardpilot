@@ -88,7 +88,7 @@ openapi-check:
 # ── E2E ───────────────────────────────────────────────────────────────────────
 .PHONY: e2e
 e2e:
-	@echo "Playwright E2E not yet implemented (T46/T47)."
+	npm --prefix frontend run e2e
 
 # ── Health Probe ─────────────────────────────────────────────────────────────
 .PHONY: healthz
