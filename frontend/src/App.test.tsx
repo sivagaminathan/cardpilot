@@ -3757,3 +3757,88 @@ describe('T44 Rewards view', () => {
     expect(screen.queryByTestId('rewards-row-NW_CASH')).not.toBeInTheDocument();
   });
 });
+
+describe('T45 Accessibility and Empty-State Polish', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('shows clear no-profile messages on Dashboard without perpetual loading or profile API calls', async () => {
+    const fetchSpy = mockFetchHandlers({ profiles: [] });
+    render(<App initialEntries={['/']} />);
+
+    expect(
+      await screen.findByText('Select a demo profile to view benefit alerts.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Select a demo profile to view rewards snapshot.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Select a demo profile to view held cards.')).toBeInTheDocument();
+
+    expect(screen.queryByText('Loading benefit alerts...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading rewards snapshot...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading cards...')).not.toBeInTheDocument();
+    expect(
+      fetchSpy.mock.calls.some(([u]) => String(u).includes('/profiles/')),
+    ).toBe(false);
+  });
+
+  it('does not display $0.00 on Dashboard when no currencies are valued', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/healthz')) {
+        return { ok: true, status: 200, json: async () => ({ status: 'ok' }) } as Response;
+      }
+      if (url.endsWith('/profiles')) {
+        return { ok: true, status: 200, json: async () => MOCK_PROFILES } as Response;
+      }
+      if (url.endsWith('/profiles/maya/cards')) {
+        return { ok: true, status: 200, json: async () => MOCK_CARDS.maya } as Response;
+      }
+      if (url.endsWith('/profiles/maya/benefits')) {
+        return { ok: true, status: 200, json: async () => [] } as Response;
+      }
+      if (url.endsWith('/profiles/maya/rewards/summary')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => MOCK_T44_SUMMARY_NONE_VALUED,
+        } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ title: 'Not Found' }) } as Response;
+    });
+
+    render(<App initialEntries={['/']} />);
+
+    expect(
+      await screen.findByText('Estimated total unavailable — no currencies have a valuation.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+  });
+
+  it('provides skip-to-main-content navigation, focusable main landmark, and aria-hidden decorative emojis', async () => {
+    mockFetchHandlers();
+    render(<App initialEntries={['/']} />);
+
+    const skipLink = screen.getByRole('link', { name: 'Skip to main content' });
+    expect(skipLink).toHaveAttribute('href', '#main-content');
+
+    const main = screen.getByRole('main');
+    expect(main).toHaveAttribute('id', 'main-content');
+    expect(main).toHaveAttribute('tabindex', '-1');
+    main.focus();
+    expect(main).toHaveFocus();
+
+    const alertsHeading = await screen.findByRole('heading', {
+      level: 3,
+      name: /Upcoming Benefit Resets/i,
+    });
+    const emojiSpan = alertsHeading.querySelector('span[aria-hidden="true"]');
+    expect(emojiSpan).toBeInTheDocument();
+  });
+});

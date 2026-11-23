@@ -80,7 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profileId, onNavigateTab }
       <section className="section-card alert-section" aria-labelledby="alerts-heading">
         <div className="section-header">
           <h3 id="alerts-heading" className="section-title">
-            ⚠️ Upcoming Benefit Resets (Expiring Within 30 Days)
+            <span aria-hidden="true">⚠️</span> Upcoming Benefit Resets (Expiring Within 30 Days)
           </h3>
           <div className="section-actions">
             <span className="badge badge-warning">{alerts.length} Active Alerts</span>
@@ -94,7 +94,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ profileId, onNavigateTab }
           </div>
         </div>
 
-        {!hasProfile || benefitsQuery.isLoading ? (
+        {!hasProfile ? (
+          <p className="empty-message" role="status">
+            Select a demo profile to view benefit alerts.
+          </p>
+        ) : benefitsQuery.isLoading ? (
           <p className="loading-message" role="status">
             Loading benefit alerts...
           </p>
@@ -152,7 +156,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profileId, onNavigateTab }
       <section className="section-card" aria-labelledby="rewards-heading">
         <div className="section-header">
           <h3 id="rewards-heading" className="section-title">
-            🏆 Rewards Snapshot by Currency
+            <span aria-hidden="true">🏆</span> Rewards Snapshot by Currency
           </h3>
           <button
             type="button"
@@ -163,7 +167,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ profileId, onNavigateTab }
           </button>
         </div>
 
-        {!hasProfile || rewardsQuery.isLoading ? (
+        {!hasProfile ? (
+          <p className="empty-message" role="status">
+            Select a demo profile to view rewards snapshot.
+          </p>
+        ) : rewardsQuery.isLoading ? (
           <p className="loading-message" role="status">
             Loading rewards snapshot...
           </p>
@@ -210,14 +218,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ profileId, onNavigateTab }
             </div>
 
             <div className="estimated-total-summary">
-              <div className="estimated-total-row">
-                <span className="estimated-total-label">
-                  {rewardsSummary.estimated_total_label}:
-                </span>{' '}
-                <strong className="estimated-total-value">
-                  {formatCentsToUsd(rewardsSummary.estimated_total_usd_cents)}
-                </strong>
-              </div>
+              {rewardsSummary.currencies.some(
+                (bal) => bal.is_valued && bal.estimated_value_cents != null,
+              ) ? (
+                <div className="estimated-total-row">
+                  <span className="estimated-total-label">
+                    {rewardsSummary.estimated_total_label}:
+                  </span>{' '}
+                  <strong className="estimated-total-value">
+                    {formatCentsToUsd(rewardsSummary.estimated_total_usd_cents)}
+                  </strong>
+                </div>
+              ) : (
+                <p className="limitation-note" role="note">
+                  Estimated total unavailable — no currencies have a valuation.
+                </p>
+              )}
               {rewardsSummary.limitation_message && (
                 <p className="limitation-note" role="note">
                   {rewardsSummary.limitation_message}
@@ -232,7 +248,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profileId, onNavigateTab }
       <section className="section-card" aria-labelledby="cards-heading">
         <div className="section-header">
           <h3 id="cards-heading" className="section-title">
-            💳 Held Credit Cards ({cards.length})
+            <span aria-hidden="true">💳</span> Held Credit Cards ({cards.length})
           </h3>
           <button
             type="button"
@@ -243,7 +259,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ profileId, onNavigateTab }
           </button>
         </div>
 
-        {!hasProfile || cardsQuery.isLoading ? (
+        {!hasProfile ? (
+          <p className="empty-message" role="status">
+            Select a demo profile to view held cards.
+          </p>
+        ) : cardsQuery.isLoading ? (
           <p className="loading-message" role="status">
             Loading cards...
           </p>

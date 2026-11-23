@@ -41,9 +41,32 @@ button, select, input {
   font-size: 1rem;
 }
 
-a:focus-visible, button:focus-visible, select:focus-visible {
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  background-color: var(--primary);
+  color: #ffffff;
+  padding: 0.625rem 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 1rem;
+  top: 0.75rem;
 }
 
 .app-container {
@@ -71,7 +94,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 }
 
 .disclaimer-badge {
-  background-color: #d97706;
+  background-color: #b45309;
   color: #ffffff;
   padding: 0.125rem 0.5rem;
   font-weight: 700;
@@ -98,6 +121,8 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .brand {
@@ -628,10 +653,10 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 .form-control {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   background-color: var(--surface-color);
-  color: var(--text-color);
+  color: var(--text-main);
 }
 
 .form-hint {
@@ -726,7 +751,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .rule-card {
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 1rem;
   background-color: var(--surface-color);
 }
@@ -828,7 +853,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .compare-cards-fieldset {
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
 }
 
@@ -867,7 +892,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .compare-result-card {
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 1rem;
   background-color: var(--surface-color);
 }
@@ -947,7 +972,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .valuation-card {
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 1rem;
   background-color: var(--surface-color);
   display: flex;
@@ -1001,7 +1026,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   padding: 1rem;
   border: 1px solid #86efac;
   background-color: #f0fdf4;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
 }
 
 .tx-snapshot-heading {
@@ -1030,7 +1055,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .tx-item-card {
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 1rem;
   background-color: var(--surface-color);
   display: flex;
@@ -1083,7 +1108,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .benefit-card {
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 1rem;
   background-color: var(--surface-color);
   display: flex;
@@ -1213,4 +1238,36 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.875rem;
+}
+
+/* Shared Feedback & Error States (T45) */
+.error-state {
+  border: 1px solid #fca5a5;
+  background-color: #fef2f2;
+  color: #991b1b;
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.reset-feedback {
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.reset-feedback--success {
+  border: 1px solid #86efac;
+  background-color: #f0fdf4;
+  color: #166534;
+}
+
+.reset-feedback--error {
+  border: 1px solid #fca5a5;
+  background-color: #fef2f2;
+  color: #991b1b;
 }

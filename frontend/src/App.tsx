@@ -71,6 +71,9 @@ export const AppShell: React.FC<AppShellProps> = ({ rulesReferenceDate }) => {
 
   return (
     <div className="app-container">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <DisclaimerBanner />
       <Header
         profiles={profiles}
