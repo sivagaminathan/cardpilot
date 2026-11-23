@@ -16,4 +16,18 @@ test('loads application shell with disclaimer and seeded Maya profile', async ({
   await expect(profileSelect.locator('option[value="maya"]')).toHaveText(
     'Maya — The Optimizer',
   );
+
+  await page.getByRole('link', { name: /^Compare$/i }).click();
+  await expect(page).toHaveURL(/\/compare$/);
+  await expect(disclaimer).toBeVisible();
+  await expect(disclaimer).toContainText(
+    'Sample data only. Not issuer terms. Not financial advice.',
+  );
+
+  await page.getByRole('link', { name: /^Rules$/i }).click();
+  await expect(page).toHaveURL(/\/rules$/);
+  await expect(disclaimer).toBeVisible();
+  await expect(disclaimer).toContainText(
+    'Sample data only. Not issuer terms. Not financial advice.',
+  );
 });

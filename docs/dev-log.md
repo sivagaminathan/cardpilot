@@ -833,3 +833,24 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - `uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`: 378 passed in 128.76s (96.78% engine branch coverage).
   - `uv run --directory backend --extra dev ruff check .` & `ruff format --check .`: Clean (96 files); `mypy app`: Success (50 source files).
   - `npm --prefix frontend run lint`, `npm --prefix frontend run build`, `npm --prefix frontend test`: Clean (0 errors, 11/11 tests).
+
+---
+
+### Task T49: QA Review Pass (`AC-1`–`AC-15`, `AC-17`)
+- **Date:** 2026-11-23
+- **What was done:**
+  - Audited `AC-1` through `AC-15` and `AC-17` (`AC-16` deployment remains deferred until after Gate G5).
+  - Fixed `Makefile` `lint-be` target (`python -m mypy .` → `python -m mypy app`) to align local backend typechecking with CI (`python -m mypy backend`), resolving the 22 test-file annotation errors that caused `make lint-be` to fail locally while keeping strict typing on `app/engine/` and standard typing on `app/`.
+  - Extended `frontend/e2e/smoke.spec.ts` to navigate to `/` (Dashboard), `/compare`, and `/rules`, asserting `Demo Disclaimer` (`Sample data only. Not issuer terms. Not financial advice.`) is visible on all three `AC-17` routes.
+- **Verification & Testing (Actual Sequential Results):**
+  - **Backend Pytest (`uv run --directory backend --extra dev pytest --cov=app.engine --cov-branch --cov-fail-under=90 --cov-report=term-missing`):** `378 passed, 4 warnings in 76.94s` (`96.78%` engine branch coverage; exit `0`).
+  - **Backend Lint & Typecheck (`ruff check .`, `ruff format --check .`, `mypy app`):** `ruff check .` passed (`All checks passed!`), `ruff format --check .` passed (`97 files already formatted`), `mypy app` passed (`Success: no issues found in 50 source files`; exit `0`).
+  - **OpenAPI & Type Check (`export_openapi.py --check`, `npm --prefix frontend run openapi:check`):** Both passed (`OpenAPI 3.1 schema is up to date`, `Generated TypeScript API types are up to date`; exit `0`).
+  - **Frontend Test, Lint, Build (`npm --prefix frontend test`, `run lint`, `run build`):** Vitest `2 passed (2)` files, `59 passed (59)` tests (`10.86s`); ESLint `0` errors (`1` pre-existing `react-refresh/only-export-components` warning in `frontend/src/components/BackendStatus.tsx`); `tsc && vite build` succeeded (`built in 1.52s`).
+  - **Playwright E2E (`npm --prefix frontend run e2e`):** `5 passed (8.7s)` (`benefit-usage`, `compare`, `smoke` covering `/`, `/compare`, `/rules`, `transaction-to-rewards`, `valuation-reorder`; exit `0`).
+  - **GitHub Actions CI (prior push `9642fb9`, run `45197411141`):** All 5 jobs passed (`backend-quality`, `frontend-quality`, `test`, `e2e` 5/5, `security` `pip-audit` + `npm audit` + `gitleaks`).
+- **Acceptance Criteria Status & Remaining Gaps:**
+  - **Automated (`AC-1`–`AC-15`):** Verified passing sequentially across backend engine/API tests, frontend Vitest, OpenAPI diff check, Playwright E2E, and CI run `45197411141`.
+  - **`AC-17` (Disclosure — manual check):** Automated DOM/Playwright visibility is verified on `/`, `/compare`, and `/rules` (`smoke.spec.ts` + `App.test.tsx`); genuine visual inspection in Chrome DevTools could not run (`DevToolsActivePort` not available), so manual visual browser confirmation remains pending.
+  - **`AC-16` (Deployment):** Deferred until Phase 7 after Gate G5.
+  - **Non-blocking note:** `opentelemetry-instrumentation-sqlalchemy` logs a version-range error with `sqlalchemy 2.1.8` (`>= 1.0.0, < 2.1.0` expected), tracked for Phase 6 (`T52`).

@@ -52,7 +52,7 @@ test-be:
 
 .PHONY: lint-be
 lint-be:
-	cd backend && python -m ruff check . && python -m ruff format --check . && python -m mypy .
+	cd backend && python -m ruff check . && python -m ruff format --check . && python -m mypy app
 
 # ── Frontend Tests & Quality ──────────────────────────────────────────────────
 .PHONY: test-fe
