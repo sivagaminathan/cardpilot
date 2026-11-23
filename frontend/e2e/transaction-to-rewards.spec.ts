@@ -12,7 +12,7 @@ test('records a transaction on /transactions and verifies per-currency and estim
   await cardSelect.selectOption({ label: 'Dining & Travel (Northwind Dining & Travel)' });
 
   await page.getByLabel('Amount (USD)').fill('100.00');
-  await page.getByLabel('Category').selectOption('dining');
+  await page.getByLabel('Category', { exact: true }).selectOption('dining');
   await page.getByLabel('Note (optional)').fill('E2E dinner');
   await page.getByRole('button', { name: 'Record Transaction' }).click();
 
