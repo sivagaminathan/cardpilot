@@ -2926,6 +2926,7 @@ describe('T42 Transactions view', () => {
 
     // Empty profiles -> no profile requests
     const emptyFetchSpy = mockT42Fetch({ profiles: [] });
+    emptyFetchSpy.mockClear();
     const { unmount: unmountEmpty } = render(<App initialEntries={['/transactions']} />);
     expect(
       await screen.findByText('Select a demo profile to record and view transactions.'),
@@ -3709,6 +3710,7 @@ describe('T44 Rewards view', () => {
 
     // No-profile state -> zero profile requests
     const emptyFetchSpy = mockT44Fetch({ profiles: [] });
+    emptyFetchSpy.mockClear();
     const { unmount: unmountNoProfile } = render(<App initialEntries={['/rewards']} />);
     expect(
       await screen.findByText('Select a demo profile to view earned rewards.'),
