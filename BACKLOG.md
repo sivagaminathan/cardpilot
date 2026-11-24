@@ -89,7 +89,7 @@ Conventions
 - [x] **T55** Verify current Render/Neon constraints; record in ADR; adjust plan if needed (ask first if stack changes).
 - [ ] **T56** Production config: env vars, CORS, pooled DB URL, migration-on-deploy, seed-on-first-deploy.
 - [ ] **T57** Deploy backend + DB; verify `/healthz`, `/readyz`, one recommendation via curl.
-- [ ] **T58** Deploy frontend; wire API URL; verify J1–J3 manually.
+- [ ] **T58** Deploy frontend; wire API URL; verify J1–J3 manually *(Static Site config & runbook prepared; live deploy + manual J1–J3 check pending cloud provisioning)*.
 - [ ] **T59** CD workflow + post-deploy smoke test (with warm-up for cold start).
 - [ ] **T60** Decide/implement deployed telemetry level per D-5.
 

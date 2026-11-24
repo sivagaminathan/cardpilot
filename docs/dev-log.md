@@ -868,3 +868,18 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
 - **Verification & Review:**
   - Independent read-only ADR review verdict: **`APPROVED`** (zero Critical, High, or Medium findings).
   - Remaining empirical verification items for `T56`/`T57`: live Neon `-pooler` `asyncpg` compatibility and Render `X-Forwarded-For` proxy-hop count (`TRUSTED_PROXY_COUNT`).
+
+---
+
+### Task T58: Production Frontend Static Site Preparation (Local Config & Docs)
+- **Date:** 2026-11-23
+- **What was done:**
+  - Updated `docs/deployment-render-neon.md` with Render Static Site (`cardpilot-web`) configuration (`frontend/`, `npm ci && npm run build`, publish `dist/`, `VITE_API_BASE_URL=https://<actual-api-host>/api/v1` noted as build-time requiring rebuild on change, and `/*` → `/index.html` `Rewrite` 200).
+  - Documented the CORS handoff to `cardpilot-api` (`CORS_ORIGINS` updated to exact Static Site HTTPS origin without trailing slash or `*`) and manual J1–J3 + SPA reload verification steps.
+  - Confirmed `getApiBaseUrl` (`frontend/src/api/client.test.ts`) and `getHealthUrl` (`frontend/src/App.test.tsx`) already have full unit coverage; preserved `render.yaml` and `.github/workflows/deploy.yml` unchanged.
+- **Verification & Testing (Local Only):**
+  - `npm --prefix frontend test`: `2 passed (2)` files, `59 passed (59)` tests.
+  - `npm --prefix frontend run lint`: `0` errors (`1` pre-existing warning in `BackendStatus.tsx`).
+  - `npm --prefix frontend run build`: `tsc && vite build` succeeded.
+  - `git diff --check`: Exited `0`.
+- **Remaining Pending Cloud Work:** Live Render Static Site creation (`cardpilot-web`), wiring `CORS_ORIGINS` on `cardpilot-api`, and manual J1–J3 + SPA reload verification remain pending cloud provisioning.

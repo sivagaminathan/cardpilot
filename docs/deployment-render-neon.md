@@ -76,3 +76,41 @@ Replace `<API_HOST>` with your Render Web Service hostname (note: Render Free co
 
 3. **Verify `TRUSTED_PROXY_COUNT` (Pending Live Check):**
    - Inspect `X-RateLimit-Remaining` across two `POST` requests (or inspect Render's `X-Forwarded-For` header behavior) to confirm `TRUSTED_PROXY_COUNT=1` extracts the client IP rather than Render's edge proxy.
+
+---
+
+## 6. Create Render Static Site (`T58` Frontend) **[Manual Cloud Console]**
+
+1. In Render Dashboard, create a **Static Site** (`cardpilot-web`) from this repository (do not modify the existing development `render.yaml`):
+   - **Name:** `cardpilot-web`
+   - **Root Directory:** `frontend`
+   - **Build Command:** `npm ci && npm run build`
+   - **Publish Directory:** `dist`
+   - **Auto-Deploy:** `Off` (`autoDeploy: false`, triggered via CD in `T59` or manually)
+2. Set the build-time environment variable before building:
+   - `VITE_API_BASE_URL`: `https://<actual-api-host>/api/v1` (replace `<actual-api-host>` with the `cardpilot-api` hostname from Step 3)
+   - *Note:* `VITE_API_BASE_URL` is inlined by Vite at **build time**; changing it later requires a frontend rebuild/redeploy.
+3. Add a **Rewrite / Redirect** rule for client-side SPA routing (`BrowserRouter`):
+   - **Source:** `/*`
+   - **Destination:** `/index.html`
+   - **Action:** `Rewrite` (HTTP `200`)
+
+---
+
+## 7. CORS Handoff to `cardpilot-api` **[Manual Cloud Console]**
+
+1. Copy the exact HTTPS URL assigned by Render to `cardpilot-web` (e.g., `https://<actual-web-host>.onrender.com`).
+2. In Render Dashboard → `cardpilot-api` → **Environment**, replace `https://placeholder.invalid` in `CORS_ORIGINS` with that exact HTTPS origin (no trailing slash, no `*`).
+3. Save and allow `cardpilot-api` to redeploy/restart so the updated CORS allowlist takes effect.
+
+---
+
+## 8. Verify J1–J3 & SPA Routing Manually (`T58`) **[Manual Browser Verification]**
+
+Open `https://<actual-web-host>` in a browser (allow 30–50s+ on the first request if `cardpilot-api` spun down after 15 min idle):
+
+1. **API & Disclosure Check:** Confirm the `DEMO DATA ONLY` banner is visible and `BackendStatus` shows **API Connected**.
+2. **J1 (Profile & Dashboard):** Select `Maya — The Optimizer`, verify held cards, benefit alerts, and per-currency rewards snapshot load.
+3. **J2 (Compare):** Navigate to `/compare`, compare a `$100.00` Dining purchase, verify ranked cards + unranked `Skyward Explorer` limitation message + explanation toggle.
+4. **J3 (Rules / Transactions & Valuations):** Navigate to `/rules` and `/transactions` (or `/settings`), verify live API reads/writes succeed without CORS errors.
+5. **SPA Direct Reload:** Directly reload `/compare` and `/rules` in the browser address bar to confirm the `/*` → `/index.html` rewrite returns HTTP `200` without a 404.
