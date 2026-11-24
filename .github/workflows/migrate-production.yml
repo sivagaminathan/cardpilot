@@ -1,0 +1,64 @@
+name: Migrate Production DB
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate-production
+  cancel-in-progress: false
+
+jobs:
+  migrate-and-seed:
+    name: Migrate & Seed Production (Neon)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    if: >-
+      (
+        github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main'
+      ) ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.event == 'push'
+      )
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Verify DIRECT_DATABASE_URL secret is configured
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: |
+          if [ -z "${DIRECT_DATABASE_URL}" ]; then
+            echo "Error: DIRECT_DATABASE_URL secret is not configured in the production environment." >&2
+            exit 1
+          fi
+
+      - name: Set up Python 3.11 and uv
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv and sync backend runtime dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --directory backend --frozen --no-dev
+
+      - name: Run Alembic migrations and seed-on-first-deploy
+        working-directory: backend
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: uv run --no-sync sh scripts/release.sh

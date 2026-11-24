@@ -73,10 +73,10 @@ Conventions
 
 ## Phase 5 — E2E and quality hardening
 - [x] **T46** Playwright setup + deterministic reset-before-test fixture.
-- [ ] **T47** E2E specs: compare (ranked+unranked), add transaction → summary, valuation change → reorder, benefit usage.
-- [ ] **T48** CI e2e job + trace artifacts; security job (pip-audit, npm audit, gitleaks).
-- [ ] **T49** QA review pass: re-run ACs checklist; fix gaps; log results (actual) in `docs/dev-log.md`.
-- [ ] **T50** Security review pass (subagent): headers, validation, CORS, dependency audit, secrets, logging of free text.
+- [x] **T47** E2E specs: compare (ranked+unranked), add transaction → summary, valuation change → reorder, benefit usage.
+- [x] **T48** CI e2e job + trace artifacts; security job (pip-audit, npm audit, gitleaks).
+- [x] **T49** QA review pass: re-run ACs checklist; fix gaps; log results (actual) in `docs/dev-log.md` (`AC-17` visual verification passed on `/`, `/compare`, `/rules`).
+- [x] **T50** Security review pass (subagent): headers, validation, CORS, dependency audit, secrets, logging of free text.
 - [ ] **Gate G5:** all CI green on `main`; human approves starting deployment.
 
 ## Phase 6 — Local observability
@@ -86,7 +86,7 @@ Conventions
 - [ ] **T54** Grafana dashboard JSON committed; README screenshots from a real run.
 
 ## Phase 7 — Deployment (only after Gate G5)
-- [ ] **T55** Verify current Render/Neon constraints; record in ADR; adjust plan if needed (ask first if stack changes).
+- [x] **T55** Verify current Render/Neon constraints; record in ADR; adjust plan if needed (ask first if stack changes).
 - [ ] **T56** Production config: env vars, CORS, pooled DB URL, migration-on-deploy, seed-on-first-deploy.
 - [ ] **T57** Deploy backend + DB; verify `/healthz`, `/readyz`, one recommendation via curl.
 - [ ] **T58** Deploy frontend; wire API URL; verify J1–J3 manually.

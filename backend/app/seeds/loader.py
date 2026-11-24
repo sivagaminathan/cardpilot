@@ -448,16 +448,21 @@ async def reset_profile_to_seed(session: AsyncSession, profile: Profile) -> tupl
     return cards_restored, valuations_restored
 
 
-async def _main() -> None:
+async def _main(*, if_empty: bool = False) -> None:
     session_factory = get_session_maker()
     try:
-        async with session_factory() as session:
-            async with session.begin():
+        async with session_factory() as session, session.begin():
+            if if_empty:
+                await ensure_seeded(session)
+                print("Checked seed state (seed-on-first-deploy complete).")
+            else:
                 counts = await seed_all(session)
-            print(f"Seeded CardPilot catalog and demo profiles: {counts}")
+                print(f"Seeded CardPilot catalog and demo profiles: {counts}")
     finally:
         await close_engine()
 
 
 if __name__ == "__main__":
-    asyncio.run(_main())
+    import sys
+
+    asyncio.run(_main(if_empty="--if-empty" in sys.argv[1:]))

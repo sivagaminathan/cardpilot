@@ -12,10 +12,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml README.md alembic.ini ./
 COPY alembic/ ./alembic/
 COPY app/ ./app/
+COPY scripts/ ./scripts/
 
-# Install application and dependencies in editable mode for dev hot-reloading
-RUN pip install --no-cache-dir -e .
+# Install application and dependencies in editable mode
+RUN pip install --no-cache-dir -e . \
+    && addgroup --system app \
+    && adduser --system --ingroup app app \
+    && chmod +x /app/scripts/release.sh \
+    && chown -R app:app /app
+
+USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

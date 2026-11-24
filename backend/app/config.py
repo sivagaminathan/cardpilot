@@ -83,6 +83,16 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/cardpilot",
         alias="DATABASE_URL",
     )
+    db_statement_cache_size: int | None = Field(default=None, ge=0, alias="DB_STATEMENT_CACHE_SIZE")
+    db_pool_size: int = Field(default=5, ge=1, alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=5, ge=0, alias="DB_MAX_OVERFLOW")
+
+    @field_validator("db_statement_cache_size", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("database_url", mode="before")
     @classmethod

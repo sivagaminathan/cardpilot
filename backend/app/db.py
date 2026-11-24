@@ -30,10 +30,16 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
+        connect_args: dict[str, int] = {}
+        if settings.db_statement_cache_size is not None:
+            connect_args["statement_cache_size"] = settings.db_statement_cache_size
         _engine = create_async_engine(
             settings.database_url,
             echo=False,
             pool_pre_ping=True,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            connect_args=connect_args,
         )
     return _engine
 

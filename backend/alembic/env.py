@@ -26,8 +26,8 @@ target_metadata = Base.metadata
 
 
 def get_database_url() -> str:
-    """Return database URL from environment, alembic config, or app settings."""
-    url = os.environ.get("DATABASE_URL")
+    """Return database URL, preferring DIRECT_DATABASE_URL for migrations."""
+    url = os.environ.get("DIRECT_DATABASE_URL") or os.environ.get("DATABASE_URL")
     if not url:
         ini_url = config.get_main_option("sqlalchemy.url")
         if ini_url and ini_url != "driver://user:pass@localhost/dbname":

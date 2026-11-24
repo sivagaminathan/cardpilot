@@ -851,6 +851,20 @@ This log documents the implementation process for CardPilot (AI Dev Tools Zoomca
   - **GitHub Actions CI (prior push `9642fb9`, run `45197411141`):** All 5 jobs passed (`backend-quality`, `frontend-quality`, `test`, `e2e` 5/5, `security` `pip-audit` + `npm audit` + `gitleaks`).
 - **Acceptance Criteria Status & Remaining Gaps:**
   - **Automated (`AC-1`–`AC-15`):** Verified passing sequentially across backend engine/API tests, frontend Vitest, OpenAPI diff check, Playwright E2E, and CI run `45197411141`.
-  - **`AC-17` (Disclosure — manual check):** Automated DOM/Playwright visibility is verified on `/`, `/compare`, and `/rules` (`smoke.spec.ts` + `App.test.tsx`); genuine visual inspection in Chrome DevTools could not run (`DevToolsActivePort` not available), so manual visual browser confirmation remains pending.
+  - **`AC-17` (Disclosure — manual check):** **Passed.** Automated DOM/Playwright visibility is verified on `/`, `/compare`, and `/rules` (`smoke.spec.ts` + `App.test.tsx`). In addition, manual visual browser inspection was completed in headless Chromium (`1280×800` desktop and `390×844` mobile) across `/`, `/compare`, and `/rules`, visually inspecting six scratch-directory screenshots (`desktop-dashboard.png`, `desktop-compare.png`, `desktop-rules.png`, `mobile-dashboard.png`, `mobile-compare.png`, `mobile-rules.png`; captured outside the repository) and confirming the `DEMO DATA ONLY` banner is visible, readable, high-contrast, unclipped, and non-overlapping on all three routes.
   - **`AC-16` (Deployment):** Deferred until Phase 7 after Gate G5.
   - **Non-blocking note:** `opentelemetry-instrumentation-sqlalchemy` logs a version-range error with `sqlalchemy 2.1.8` (`>= 1.0.0, < 2.1.0` expected), tracked for Phase 6 (`T52`).
+
+---
+
+### Task T55: Render/Neon Deployment Discovery & ADR (`0001-render-neon-deployment-architecture.md`)
+- **Date:** 2026-11-23
+- **What was done:**
+  - Verified current Render and Neon constraints and documented the deployment architecture in `docs/decisions/0001-render-neon-deployment-architecture.md` (`Status: Proposed` pending tier and `D-5` telemetry confirmation):
+    - **Architecture:** Render Static Site (`frontend/` SPA with `/*` → `/index.html` rewrite), Render Web Service (`backend/` bound to `0.0.0.0:$PORT` without `--reload`), and Neon Postgres.
+    - **Paid vs. Free migration strategy:** Native Render pre-deploy command for a Paid backend (`alembic upgrade head && python -m app.seeds.loader`), or a dedicated GitHub Actions migration job for a Free backend (no native pre-deploy support on Free tier; migrations not run on every app startup).
+    - **Database connection separation:** Neon pooled (`-pooler`) URL for runtime traffic vs. direct Neon URL for Alembic migrations.
+    - **Asyncpg/Neon compatibility:** Deferred empirical verification of SQLAlchemy + `asyncpg` statement-cache behavior against a live Neon `-pooler` endpoint to `T56`/`T57`, preserving a configurable option if `statement_cache_size=0` proves necessary.
+- **Verification & Review:**
+  - Independent read-only ADR review verdict: **`APPROVED`** (zero Critical, High, or Medium findings).
+  - Remaining empirical verification items for `T56`/`T57`: live Neon `-pooler` `asyncpg` compatibility and Render `X-Forwarded-For` proxy-hop count (`TRUSTED_PROXY_COUNT`).
